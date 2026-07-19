@@ -20,6 +20,7 @@
 - Do not add terminal selection, history, menu-bar residency, custom shortcuts, or automatic updates.
 - Follow strict RED → GREEN → REFACTOR: every production behavior starts with a test that is run and observed failing for the expected reason.
 - The package must build without third-party dependencies.
+- Use `./scripts/test.sh` as the project-standard test command; it must invoke Swift Testing directly under full Xcode and add the installed Command Line Tools framework/rpaths only when that fallback is detected.
 
 ---
 
@@ -43,6 +44,7 @@
 
 **Files:**
 - Create: `Package.swift`
+- Create: `scripts/test.sh`
 - Create: `Sources/TerminalHelper/FolderBatchPlanner.swift`
 - Create: `Tests/TerminalHelperTests/FolderBatchPlannerTests.swift`
 
@@ -53,6 +55,8 @@
 - [ ] **Step 1: Create the package manifest and write failing planner tests**
 
 Create a macOS 13 package named `TerminalHelper`, with an executable target at `Sources/TerminalHelper` and a test target at `Tests/TerminalHelperTests`. Add tests using real temporary filesystem items:
+
+Create `scripts/test.sh` as an executable wrapper around `swift test --enable-swift-testing --disable-xctest`. If `/Library/Developer/CommandLineTools/Library/Developer/Frameworks/Testing.framework` exists, pass that framework path with `-Xswiftc -F`, pass framework and `/Library/Developer/CommandLineTools/Library/Developer/usr/lib` rpaths with `-Xlinker`, and suppress the known CLT deployment-link warning with `-Xlinker -w`. Forward all caller arguments. Without that CLT framework, call Swift Testing directly with the forwarded arguments and no machine-specific flags.
 
 ```swift
 import Foundation
@@ -97,7 +101,7 @@ struct FolderBatchPlannerTests {
 
 - [ ] **Step 2: Run the tests and verify RED**
 
-Run: `swift test --filter FolderBatchPlannerTests`
+Run: `./scripts/test.sh --filter FolderBatchPlannerTests`
 
 Expected: compilation fails because `FolderBatchPlanner`, `FolderBatchPlan`, and `FolderInputFailure` do not exist.
 
@@ -155,7 +159,7 @@ struct FolderBatchPlanner: FolderBatchPlanning {
 
 - [ ] **Step 4: Run the focused and full test suite and verify GREEN**
 
-Run: `swift test --filter FolderBatchPlannerTests`, then `swift test`.
+Run: `./scripts/test.sh --filter FolderBatchPlannerTests`, then `./scripts/test.sh`.
 
 Expected: both commands pass with no failures or warnings.
 
@@ -164,7 +168,7 @@ Expected: both commands pass with no failures or warnings.
 Run:
 
 ```bash
-git add Package.swift Sources/TerminalHelper/FolderBatchPlanner.swift Tests/TerminalHelperTests/FolderBatchPlannerTests.swift
+git add Package.swift scripts/test.sh Sources/TerminalHelper/FolderBatchPlanner.swift Tests/TerminalHelperTests/FolderBatchPlannerTests.swift
 git commit -m "feat: plan dropped folder batches"
 ```
 
@@ -230,7 +234,7 @@ private final class RecordingScriptExecutor: ScriptExecuting {
 
 - [ ] **Step 2: Run the tests and verify RED**
 
-Run: `swift test --filter TerminalLauncherTests`
+Run: `./scripts/test.sh --filter TerminalLauncherTests`
 
 Expected: compilation fails because the launcher, quoter, executor protocol, and launch error types do not exist.
 
@@ -303,7 +307,7 @@ struct TerminalLauncher: TerminalLaunching {
 
 - [ ] **Step 4: Run focused tests, then the full suite, and verify GREEN**
 
-Run: `swift test --filter TerminalLauncherTests`, then `swift test`.
+Run: `./scripts/test.sh --filter TerminalLauncherTests`, then `./scripts/test.sh`.
 
 Expected: both commands pass with no failures or warnings.
 
@@ -377,7 +381,7 @@ Add focused tests for an all-invalid batch and an empty input. Test helpers stay
 
 - [ ] **Step 2: Run the tests and verify RED**
 
-Run: `swift test --filter FolderOpenCoordinatorTests`
+Run: `./scripts/test.sh --filter FolderOpenCoordinatorTests`
 
 Expected: compilation fails because `FolderOpenCoordinator`, `OpenStatus`, and `OpenSummary` do not exist.
 
@@ -447,7 +451,7 @@ final class FolderOpenCoordinator: ObservableObject {
 
 - [ ] **Step 4: Run focused tests and the full suite and verify GREEN**
 
-Run: `swift test --filter FolderOpenCoordinatorTests`, then `swift test`.
+Run: `./scripts/test.sh --filter FolderOpenCoordinatorTests`, then `./scripts/test.sh`.
 
 Expected: all tests pass with no failures or warnings.
 
@@ -521,7 +525,7 @@ private final class RecordingFolderOpener: FolderOpening {
 
 - [ ] **Step 2: Run the routing tests and verify RED**
 
-Run: `swift test --filter AppDelegateTests`
+Run: `./scripts/test.sh --filter AppDelegateTests`
 
 Expected: compilation fails because `AppDelegate` and `FolderOpening` do not exist.
 
@@ -542,7 +546,7 @@ Compose the app with `@main struct TerminalHelperApp: App`, `@NSApplicationDeleg
 
 - [ ] **Step 4: Run routing tests and verify GREEN**
 
-Run: `swift test --filter AppDelegateTests`, then `swift test`.
+Run: `./scripts/test.sh --filter AppDelegateTests`, then `./scripts/test.sh`.
 
 Expected: routing tests and the full suite pass with no failures or warnings.
 
@@ -572,7 +576,7 @@ Create an executable `scripts/build-app.sh` that:
 Document exact commands:
 
 ```bash
-swift test
+./scripts/test.sh
 ./scripts/build-app.sh
 open "dist/Terminal Helper.app"
 ```
@@ -584,7 +588,7 @@ Explain the first-run Automation prompt, the System Settings recovery path, wind
 Run:
 
 ```bash
-swift test
+./scripts/test.sh
 swift build -c release
 ./scripts/build-app.sh
 plutil -lint Resources/Info.plist
@@ -612,7 +616,7 @@ git commit -m "feat: add native folder drop application"
 After all task reviews are clean, run:
 
 ```bash
-swift test
+./scripts/test.sh
 swift build -c release
 ./scripts/build-app.sh
 plutil -lint Resources/Info.plist
