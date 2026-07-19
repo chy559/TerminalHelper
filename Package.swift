@@ -5,7 +5,10 @@ let package = Package(
     name: "TerminalHelper",
     platforms: [.macOS(.v13)],
     targets: [
-        .executableTarget(name: "TerminalHelper"),
+        .executableTarget(
+            name: "TerminalHelper",
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]
+        ),
         .testTarget(name: "TerminalHelperTests", dependencies: ["TerminalHelper"]),
     ]
 )
