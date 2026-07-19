@@ -35,4 +35,38 @@ struct FolderBatchPlannerTests {
         #expect(plan.validFolders.isEmpty)
         #expect(plan.failures.map(\.reason) == [.notDirectory, .missing])
     }
+
+    @Test("rejects non-file URLs before interpreting their paths")
+    func rejectsNonFileURLWithExistingDirectoryPath() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let httpURL = try #require(URL(string: "https://example.invalid\(directory.path)"))
+
+        let plan = FolderBatchPlanner().makePlan(for: [httpURL])
+
+        #expect(plan.validFolders.isEmpty)
+        #expect(plan.failures == [.init(url: httpURL, reason: .notFileURL)])
+    }
+
+    @Test("rejects readable directories without search permission")
+    func rejectsDirectoryWithoutSearchPermission() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let directory = root.appending(path: "readable-only", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: directory.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+            try? FileManager.default.removeItem(at: root)
+        }
+        try #require(FileManager.default.isReadableFile(atPath: directory.path))
+        try #require(!FileManager.default.isExecutableFile(atPath: directory.path))
+
+        let plan = FolderBatchPlanner().makePlan(for: [directory])
+
+        #expect(plan.validFolders.isEmpty)
+        #expect(plan.failures == [.init(url: directory.standardizedFileURL, reason: .unreadable)])
+    }
 }

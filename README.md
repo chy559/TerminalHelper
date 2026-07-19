@@ -5,7 +5,7 @@ Terminal Helper 是一个原生 macOS 小工具：把一个或多个文件夹拖
 ## 系统要求
 
 - macOS 13.0 或更高版本
-- 用命令行构建时需要 Apple Command Line Tools 或 Xcode
+- 用命令行构建时需要兼容 Swift 6 的 Apple Command Line Tools 或 Xcode 工具链
 
 ## 测试、构建与启动
 

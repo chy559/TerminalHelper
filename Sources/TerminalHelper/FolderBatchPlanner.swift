@@ -11,6 +11,7 @@ struct FolderBatchPlan: Equatable {
 
 struct FolderInputFailure: Equatable {
     enum Reason: Equatable {
+        case notFileURL
         case missing
         case notDirectory
         case unreadable
@@ -33,6 +34,11 @@ struct FolderBatchPlanner: FolderBatchPlanning {
         var failures: [FolderInputFailure] = []
 
         for original in urls {
+            guard original.isFileURL else {
+                failures.append(.init(url: original, reason: .notFileURL))
+                continue
+            }
+
             let url = original.standardizedFileURL
             guard seen.insert(url.path).inserted else { continue }
 
@@ -45,7 +51,8 @@ struct FolderBatchPlanner: FolderBatchPlanning {
                 failures.append(.init(url: url, reason: .notDirectory))
                 continue
             }
-            guard fileManager.isReadableFile(atPath: url.path) else {
+            guard fileManager.isReadableFile(atPath: url.path),
+                  fileManager.isExecutableFile(atPath: url.path) else {
                 failures.append(.init(url: url, reason: .unreadable))
                 continue
             }

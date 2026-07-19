@@ -66,6 +66,8 @@ struct TerminalLauncher: TerminalLaunching {
             try executor.execute(source: source)
         } catch let error as ScriptExecutionError where error.number == -1743 {
             throw TerminalLaunchError.automationPermissionDenied
+        } catch let error as ScriptExecutionError {
+            throw TerminalLaunchError.scriptFailed(error.message)
         } catch {
             throw TerminalLaunchError.scriptFailed(error.localizedDescription)
         }
