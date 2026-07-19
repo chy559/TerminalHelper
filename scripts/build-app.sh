@@ -24,6 +24,7 @@ contents_dir="$staged_app/Contents"
 mkdir -p "$contents_dir/MacOS" "$contents_dir/Resources"
 cp "$executable" "$contents_dir/MacOS/TerminalHelper"
 cp "$project_root/Resources/Info.plist" "$contents_dir/Info.plist"
+cp "$project_root/Resources/TerminalHelper.icns" "$contents_dir/Resources/TerminalHelper.icns"
 chmod 755 "$contents_dir/MacOS/TerminalHelper"
 
 codesign --force --deep --sign - "$staged_app"

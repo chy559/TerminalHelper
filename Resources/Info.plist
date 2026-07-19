@@ -21,6 +21,8 @@
     </array>
     <key>CFBundleExecutable</key>
     <string>TerminalHelper</string>
+    <key>CFBundleIconFile</key>
+    <string>TerminalHelper</string>
     <key>CFBundleIdentifier</key>
     <string>com.local.TerminalHelper</string>
     <key>CFBundleName</key>

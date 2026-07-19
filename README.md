@@ -2,6 +2,8 @@
 
 Terminal Helper 是一个原生 macOS 小工具：把一个或多个文件夹拖入窗口或 Dock 图标，即可为每个有效文件夹打开一个新的“终端”窗口。
 
+应用使用专属的“文件夹 + `>_`”图标；1024 像素主图保存在 `Resources/AppIcon/TerminalHelper-1024.png`，构建时会将编译后的 `Resources/TerminalHelper.icns` 打包进应用。
+
 ## 系统要求
 
 - macOS 13.0 或更高版本
