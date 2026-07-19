@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- The visual must be a dark graphite macOS rounded-square tile with a centered cyan-blue folder and bold white `>_` prompt.
+- The visual must be a clean white macOS rounded-square tile with a centered cyan-blue folder and bold white `>_` prompt.
 - The source master must be exactly 1024×1024 pixels with transparent corners.
 - The symbol must remain legible at 16–32 pixels.
 - Do not include words, watermark, separate arrows, Terminal.app branding, or decorative micro-detail.
@@ -72,7 +72,7 @@ Use case: logo-brand
 Asset type: native macOS application icon source, 1024×1024
 Primary request: a concise visual metaphor for opening a folder in Terminal
 Scene/backdrop: perfectly flat solid #ff00ff chroma-key background for later removal; no texture, gradient, shadow, floor, or reflection in the backdrop
-Subject: centered dark graphite macOS rounded-square tile; centered cyan-blue folder with a clear upper-left tab; bold white terminal prompt >_ integrated on the folder face
+Subject: centered clean white macOS rounded-square tile with subtle light-gray edge definition; centered cyan-blue folder with a clear upper-left tab; bold white terminal prompt >_ integrated on the folder face
 Style/medium: polished vector-like native macOS utility icon, minimal geometric shapes, restrained depth
 Composition: centered and symmetrical, generous transparent-corner padding after key removal, folder about 58% of canvas width, prompt optically centered and thick enough for 16px display
 Lighting/mood: subtle top-left highlight and gentle internal depth only

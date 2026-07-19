@@ -6,7 +6,7 @@ Create a clean, distinctive macOS application icon that communicates “open a f
 
 ## Chosen Concept
 
-Use a centered cyan-blue folder with a white terminal prompt (`>_`) on its front, placed on a dark graphite rounded-square macOS icon tile. The folder represents the dropped working directory; the prompt represents Terminal.app. Combining them into one compact symbol makes the app’s purpose recognizable without text.
+Use a centered cyan-blue folder with a white terminal prompt (`>_`) on its front, placed on a clean white rounded-square macOS icon tile. The folder represents the dropped working directory; the prompt represents Terminal.app. Combining them into one compact symbol makes the app’s purpose recognizable without text.
 
 Alternative concepts were considered and rejected:
 
@@ -17,7 +17,7 @@ Alternative concepts were considered and rejected:
 ## Visual Specification
 
 - Canvas: 1024×1024, transparent outside the icon tile.
-- Tile: centered macOS-style rounded square, approximately 86% of the canvas width, dark graphite (`#17202B` to `#222E3B`) with restrained depth.
+- Tile: centered macOS-style rounded square, approximately 86% of the canvas width, clean white with subtle light-gray edge definition and restrained depth.
 - Folder: centered, approximately 58% of the canvas width, saturated cyan-blue (`#23B5E8` to `#4CC9F0`), simple silhouette with a clear upper-left tab.
 - Terminal prompt: bold white `>_`, optically centered on the folder face, with thick strokes and generous spacing.
 - Lighting: subtle top-left highlight and gentle internal depth; no glossy reflections or decorative texture.
@@ -26,7 +26,7 @@ Alternative concepts were considered and rejected:
 
 ## Small-Size Behavior
 
-At 16–32 pixels, the icon should read as three shapes only: dark tile, blue folder, white prompt. The prompt must remain distinguishable, so its stroke weight takes priority over typographic finesse. Downscaled assets will be generated from the inspected 1024-pixel master using high-quality macOS image scaling.
+At 16–32 pixels, the icon should read as three shapes only: white tile, blue folder, white prompt. The prompt must remain distinguishable, so its stroke weight takes priority over typographic finesse. Downscaled assets will be generated from the inspected 1024-pixel master using high-quality macOS image scaling.
 
 ## Asset Pipeline
 
