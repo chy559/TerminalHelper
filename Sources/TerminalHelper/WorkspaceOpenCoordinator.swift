@@ -27,6 +27,7 @@ final class WorkspaceOpenCoordinator: ObservableObject, FolderReceiving {
 
     private let planner: any FolderBatchPlanning
     private let launcher: any WorkspaceLaunching
+    private var selectionVersion = 0
 
     init(planner: any FolderBatchPlanning, launcher: any WorkspaceLaunching) {
         self.planner = planner
@@ -37,6 +38,7 @@ final class WorkspaceOpenCoordinator: ObservableObject, FolderReceiving {
         guard !urls.isEmpty else { return }
 
         let plan = planner.makePlan(for: urls)
+        selectionVersion += 1
         pendingFolders = plan.validFolders
         status = .ready(
             .init(valid: plan.validFolders.count, invalid: plan.failures.count)
@@ -59,20 +61,25 @@ final class WorkspaceOpenCoordinator: ObservableObject, FolderReceiving {
         }
 
         let folders = pendingFolders
+        let launchedSelectionVersion = selectionVersion
         status = .launching(target)
 
         do {
             try await launcher.launch(folders: folders, in: target)
+            guard selectionVersion == launchedSelectionVersion else { return }
             pendingFolders.removeAll()
             status = .completed(target, count: folders.count)
         } catch TerminalLaunchError.automationPermissionDenied {
+            guard selectionVersion == launchedSelectionVersion else { return }
             status = .automationPermissionDenied
         } catch {
+            guard selectionVersion == launchedSelectionVersion else { return }
             status = .failed(target, message: error.localizedDescription)
         }
     }
 
     func reset() {
+        selectionVersion += 1
         pendingFolders.removeAll()
         status = .idle
     }

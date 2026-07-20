@@ -74,6 +74,27 @@ struct WorkspaceOpenCoordinatorTests {
     }
 
     @Test @MainActor
+    func aNewDropDuringLaunchIsNotClearedByTheOlderLaunchCompletion() async throws {
+        let original = try TemporaryWorkspaceFolders(count: 1)
+        let replacement = try TemporaryWorkspaceFolders(count: 2)
+        defer {
+            original.remove()
+            replacement.remove()
+        }
+        let launcher = RecordingWorkspaceLauncher()
+        let coordinator = makeCoordinator(launcher: launcher)
+        coordinator.receive(original.urls)
+        launcher.onLaunch = {
+            coordinator.receive(replacement.urls)
+        }
+
+        await coordinator.launch(in: .visualStudioCode)
+
+        #expect(coordinator.pendingFolders == replacement.urls.map(\.standardizedFileURL))
+        #expect(coordinator.status == .ready(.init(valid: 2, invalid: 0)))
+    }
+
+    @Test @MainActor
     func failedLaunchKeepsPendingFoldersForRetry() async throws {
         let folders = try TemporaryWorkspaceFolders(count: 1)
         defer { folders.remove() }
@@ -167,6 +188,7 @@ private final class RecordingWorkspaceLauncher: WorkspaceLaunching {
     let availableTargets: Set<WorkspaceTarget>
     let error: Error?
     var launchRequests: [LaunchRequest] = []
+    var onLaunch: (() -> Void)?
 
     init(
         availableTargets: Set<WorkspaceTarget> = Set(WorkspaceTarget.allCases),
@@ -182,6 +204,7 @@ private final class RecordingWorkspaceLauncher: WorkspaceLaunching {
 
     func launch(folders: [URL], in target: WorkspaceTarget) async throws {
         launchRequests.append(.init(folders: folders, target: target))
+        onLaunch?()
         if let error {
             throw error
         }
