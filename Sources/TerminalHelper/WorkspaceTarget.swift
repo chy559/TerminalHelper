@@ -1,6 +1,6 @@
 import Foundation
 
-enum WorkspaceTarget: String, CaseIterable, Equatable, Identifiable {
+enum WorkspaceTarget: String, CaseIterable, Equatable, Identifiable, Sendable {
     case terminal
     case visualStudioCode
     case intelliJIdea

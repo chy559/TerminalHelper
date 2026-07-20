@@ -5,6 +5,35 @@ import Testing
 @Suite("Workspace open coordinator")
 struct WorkspaceOpenCoordinatorTests {
     @Test @MainActor
+    func allInvalidInputShowsAnErrorWithoutPendingFolders() throws {
+        let folders = try TemporaryWorkspaceFolders(count: 0)
+        defer { folders.remove() }
+        let file = folders.root.appending(path: "notes.txt")
+        let missing = folders.root.appending(path: "missing", directoryHint: .isDirectory)
+        try Data("x".utf8).write(to: file)
+        let coordinator = makeCoordinator()
+
+        coordinator.receive([file, missing])
+
+        #expect(coordinator.pendingFolders.isEmpty)
+        #expect(coordinator.status == .ready(.init(valid: 0, invalid: 2)))
+        #expect(coordinator.statusText == "未找到可打开的文件夹（2 项无效）")
+    }
+
+    @Test @MainActor
+    func emptyInputLeavesTheCurrentSelectionUnchanged() throws {
+        let folders = try TemporaryWorkspaceFolders(count: 1)
+        defer { folders.remove() }
+        let coordinator = makeCoordinator()
+        coordinator.receive(folders.urls)
+
+        coordinator.receive([])
+
+        #expect(coordinator.pendingFolders == folders.urls.map(\.standardizedFileURL))
+        #expect(coordinator.status == .ready(.init(valid: 1, invalid: 0)))
+    }
+
+    @Test @MainActor
     func receivingFoldersReplacesThePendingSelectionAndReportsInvalidItems() throws {
         let first = try TemporaryWorkspaceFolders(count: 2)
         let replacement = try TemporaryWorkspaceFolders(count: 1)
@@ -57,6 +86,24 @@ struct WorkspaceOpenCoordinatorTests {
         #expect(coordinator.pendingFolders == folders.urls.map(\.standardizedFileURL))
         #expect(coordinator.status == .failed(.intelliJIdea, message: "测试启动失败"))
         #expect(coordinator.statusText == "无法使用 IntelliJ IDEA 打开：测试启动失败")
+    }
+
+    @Test @MainActor
+    func unavailableTargetIsRejectedWithoutLaunching() async throws {
+        let folders = try TemporaryWorkspaceFolders(count: 1)
+        defer { folders.remove() }
+        let launcher = RecordingWorkspaceLauncher(availableTargets: [.terminal])
+        let coordinator = makeCoordinator(launcher: launcher)
+        coordinator.receive(folders.urls)
+
+        await coordinator.launch(in: .visualStudioCode)
+
+        #expect(launcher.launchRequests.isEmpty)
+        #expect(coordinator.pendingFolders == folders.urls.map(\.standardizedFileURL))
+        #expect(coordinator.status == .failed(
+            .visualStudioCode,
+            message: "未找到 Visual Studio Code，请先安装后重试"
+        ))
     }
 
     @Test @MainActor

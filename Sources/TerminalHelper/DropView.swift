@@ -80,7 +80,7 @@ struct DropView: View {
                 .foregroundStyle(statusColor)
                 .lineLimit(3)
 
-            Button("清除选择") {
+            Button("重新选择文件夹") {
                 coordinator.reset()
             }
             .buttonStyle(.link)

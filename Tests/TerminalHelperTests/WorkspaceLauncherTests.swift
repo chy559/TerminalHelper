@@ -4,6 +4,15 @@ import Testing
 
 @Suite("Workspace launcher")
 struct WorkspaceLauncherTests {
+    @Test
+    func targetBundleIdentifiersMatchSupportedApplications() {
+        #expect(WorkspaceTarget.visualStudioCode.bundleIdentifiers == ["com.microsoft.VSCode"])
+        #expect(WorkspaceTarget.intelliJIdea.bundleIdentifiers == [
+            "com.jetbrains.intellij",
+            "com.jetbrains.intellij.ce",
+        ])
+    }
+
     @Test @MainActor
     func terminalIsAlwaysAvailableAndOpensFoldersInOrder() async throws {
         let terminal = RecordingTerminalLauncher()
@@ -76,6 +85,51 @@ struct WorkspaceLauncherTests {
     }
 
     @Test @MainActor
+    func intelliJIdeaPrefersUltimateEditionWhenBothAreInstalled() async throws {
+        let ultimateURL = URL(fileURLWithPath: "/Applications/IntelliJ IDEA.app")
+        let communityURL = URL(fileURLWithPath: "/Applications/IntelliJ IDEA CE.app")
+        let applications = RecordingApplicationWorkspace(installedApplications: [
+            "com.jetbrains.intellij": ultimateURL,
+            "com.jetbrains.intellij.ce": communityURL,
+        ])
+        let launcher = WorkspaceLauncher(
+            terminalLauncher: RecordingTerminalLauncher(),
+            applicationWorkspace: applications
+        )
+        let folder = URL(fileURLWithPath: "/tmp/project")
+
+        try await launcher.launch(folders: [folder], in: .intelliJIdea)
+
+        #expect(applications.bundleIdentifierQueries == ["com.jetbrains.intellij"])
+        #expect(applications.openRequests == [
+            .init(folders: [folder], applicationURL: ultimateURL),
+        ])
+    }
+
+    @Test @MainActor
+    func propagatesEditorOpenErrors() async {
+        let applicationURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
+        let applications = RecordingApplicationWorkspace(
+            installedApplications: ["com.microsoft.VSCode": applicationURL],
+            error: TestApplicationOpenError.failed
+        )
+        let launcher = WorkspaceLauncher(
+            terminalLauncher: RecordingTerminalLauncher(),
+            applicationWorkspace: applications
+        )
+
+        do {
+            try await launcher.launch(
+                folders: [URL(fileURLWithPath: "/tmp/project")],
+                in: .visualStudioCode
+            )
+            Issue.record("Expected the application open error")
+        } catch {
+            #expect(error as? TestApplicationOpenError == .failed)
+        }
+    }
+
+    @Test @MainActor
     func reportsAnUnavailableEditorWithoutOpeningAnything() async {
         let applications = RecordingApplicationWorkspace()
         let terminal = RecordingTerminalLauncher()
@@ -101,6 +155,10 @@ struct WorkspaceLauncherTests {
     }
 }
 
+private enum TestApplicationOpenError: Error {
+    case failed
+}
+
 private final class RecordingTerminalLauncher: TerminalLaunching {
     var opened: [URL] = []
 
@@ -117,11 +175,13 @@ private final class RecordingApplicationWorkspace: ApplicationWorkspaceOpening {
     }
 
     let installedApplications: [String: URL]
+    let error: Error?
     var bundleIdentifierQueries: [String] = []
     var openRequests: [OpenRequest] = []
 
-    init(installedApplications: [String: URL] = [:]) {
+    init(installedApplications: [String: URL] = [:], error: Error? = nil) {
         self.installedApplications = installedApplications
+        self.error = error
     }
 
     func applicationURL(forBundleIdentifier identifier: String) -> URL? {
@@ -131,5 +191,8 @@ private final class RecordingApplicationWorkspace: ApplicationWorkspaceOpening {
 
     func open(_ folders: [URL], withApplicationAt applicationURL: URL) async throws {
         openRequests.append(.init(folders: folders, applicationURL: applicationURL))
+        if let error {
+            throw error
+        }
     }
 }
