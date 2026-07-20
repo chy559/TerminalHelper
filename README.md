@@ -1,6 +1,6 @@
 # Terminal Helper
 
-Terminal Helper 是一个原生 macOS 小工具：把一个或多个文件夹拖入窗口或 Dock 图标，即可为每个有效文件夹打开一个新的“终端”窗口。
+Terminal Helper 是一个原生 macOS 小工具：把一个或多个文件夹拖入窗口或 Dock 图标，再选择使用系统“终端”、Visual Studio Code 或 IntelliJ IDEA 打开。
 
 应用使用专属的“文件夹 + `>_`”图标；1024 像素主图保存在 `Resources/AppIcon/TerminalHelper-1024.png`，构建时会将编译后的 `Resources/TerminalHelper.icns` 打包进应用。
 
@@ -23,10 +23,12 @@ open "dist/Terminal Helper.app"
 
 ## 使用方法
 
-- **窗口拖放：** 将文件夹拖到 Terminal Helper 窗口中的虚线区域。
-- **Dock 拖放：** 先让 Terminal Helper 保留在 Dock 中，再将文件夹拖到它的 Dock 图标上。
-- **多个文件夹：** 一次拖入多个文件夹时，应用会按顺序为每个有效文件夹打开一个新的“终端”窗口。
-- **混合内容：** 文件或无效路径不会打开；其余有效文件夹仍会继续处理，窗口状态会显示成功和失败数量。
+- **窗口拖放：** 将文件夹拖到 Terminal Helper 窗口中的虚线区域，然后从“终端”、Visual Studio Code 或 IntelliJ IDEA 中选择一个打开方式。
+- **Dock 拖放：** 先让 Terminal Helper 保留在 Dock 中，再将文件夹拖到它的 Dock 图标上；应用窗口会显示打开方式供选择。
+- **多个文件夹：** 一次拖入多个文件夹时，全部有效文件夹会交给同一个所选应用。终端会按顺序为每个文件夹打开一个新窗口。
+- **编辑器检测：** 未安装的 Visual Studio Code 或 IntelliJ IDEA 会显示“未安装”并禁用；IntelliJ IDEA Ultimate 和 Community Edition 均受支持。
+- **重新选择：** 再次拖入文件夹会替换当前选择；启动失败时会保留选择，方便重试或改用其他应用。
+- **混合内容：** 文件或无效路径不会打开，其余有效文件夹仍会保留供选择。
 
 ## 自动化权限
 

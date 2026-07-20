@@ -2,15 +2,8 @@ import AppKit
 import Foundation
 
 @MainActor
-protocol FolderOpening: AnyObject {
-    func open(_ urls: [URL])
-}
-
-extension FolderOpenCoordinator: FolderOpening {}
-
-@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    var folderOpener: (any FolderOpening)? {
+    var folderReceiver: (any FolderReceiving)? {
         didSet {
             flushPendingURLs()
         }
@@ -23,19 +16,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func route(_ urls: [URL]) {
-        guard let folderOpener else {
+        guard let folderReceiver else {
             pendingURLs.append(contentsOf: urls)
             return
         }
 
-        folderOpener.open(urls)
+        folderReceiver.receive(urls)
     }
 
     private func flushPendingURLs() {
-        guard let folderOpener, !pendingURLs.isEmpty else { return }
+        guard let folderReceiver, !pendingURLs.isEmpty else { return }
 
         let urls = pendingURLs
         pendingURLs.removeAll()
-        folderOpener.open(urls)
+        folderReceiver.receive(urls)
     }
 }

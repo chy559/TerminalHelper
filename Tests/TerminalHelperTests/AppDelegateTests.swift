@@ -5,35 +5,35 @@ import Testing
 @Suite("Application URL routing")
 struct AppDelegateTests {
     @Test @MainActor
-    func buffersURLsUntilAnOpenerIsAttached() {
+    func buffersURLsUntilAReceiverIsAttached() {
         let delegate = AppDelegate()
-        let opener = RecordingFolderOpener()
+        let receiver = RecordingFolderReceiver()
         let urls = [URL(fileURLWithPath: "/tmp/first"), URL(fileURLWithPath: "/tmp/second")]
 
         delegate.route(urls)
-        #expect(opener.received.isEmpty)
-        delegate.folderOpener = opener
+        #expect(receiver.received.isEmpty)
+        delegate.folderReceiver = receiver
 
-        #expect(opener.received == [urls])
+        #expect(receiver.received == [urls])
     }
 
     @Test @MainActor
     func forwardsURLsImmediatelyAfterAttachment() {
         let delegate = AppDelegate()
-        let opener = RecordingFolderOpener()
-        delegate.folderOpener = opener
+        let receiver = RecordingFolderReceiver()
+        delegate.folderReceiver = receiver
         let urls = [URL(fileURLWithPath: "/tmp/project")]
 
         delegate.route(urls)
 
-        #expect(opener.received == [urls])
+        #expect(receiver.received == [urls])
     }
 
     @Test @MainActor
     func flushesMultipleBufferedCallsOnceInOrderWithoutReplayingOnReassignment() {
         let delegate = AppDelegate()
-        let firstOpener = RecordingFolderOpener()
-        let replacementOpener = RecordingFolderOpener()
+        let firstReceiver = RecordingFolderReceiver()
+        let replacementReceiver = RecordingFolderReceiver()
         let first = URL(fileURLWithPath: "/tmp/first")
         let second = URL(fileURLWithPath: "/tmp/second")
         let third = URL(fileURLWithPath: "/tmp/third")
@@ -41,26 +41,26 @@ struct AppDelegateTests {
 
         delegate.route([first])
         delegate.route([second, third])
-        delegate.folderOpener = firstOpener
+        delegate.folderReceiver = firstReceiver
 
-        #expect(firstOpener.received == [[first, second, third]])
+        #expect(firstReceiver.received == [[first, second, third]])
 
-        delegate.folderOpener = replacementOpener
+        delegate.folderReceiver = replacementReceiver
 
-        #expect(firstOpener.received == [[first, second, third]])
-        #expect(replacementOpener.received.isEmpty)
+        #expect(firstReceiver.received == [[first, second, third]])
+        #expect(replacementReceiver.received.isEmpty)
 
         delegate.route([fourth])
 
-        #expect(replacementOpener.received == [[fourth]])
+        #expect(replacementReceiver.received == [[fourth]])
     }
 }
 
 @MainActor
-private final class RecordingFolderOpener: FolderOpening {
+private final class RecordingFolderReceiver: FolderReceiving {
     var received: [[URL]] = []
 
-    func open(_ urls: [URL]) {
+    func receive(_ urls: [URL]) {
         received.append(urls)
     }
 }

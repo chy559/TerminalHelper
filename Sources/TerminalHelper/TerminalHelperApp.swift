@@ -3,18 +3,18 @@ import SwiftUI
 @main
 struct TerminalHelperApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var coordinator = FolderOpenCoordinator(
+    @StateObject private var coordinator = WorkspaceOpenCoordinator(
         planner: FolderBatchPlanner(),
-        launcher: TerminalLauncher()
+        launcher: WorkspaceLauncher()
     )
 
     var body: some Scene {
         WindowGroup {
             DropView(coordinator: coordinator)
                 .onAppear {
-                    appDelegate.folderOpener = coordinator
+                    appDelegate.folderReceiver = coordinator
                 }
         }
-        .defaultSize(width: 480, height: 320)
+        .defaultSize(width: 500, height: 440)
     }
 }
