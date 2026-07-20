@@ -95,6 +95,35 @@ struct WorkspaceOpenCoordinatorTests {
     }
 
     @Test @MainActor
+    func aPendingBatchCannotStartASecondLaunchWhileTheFirstIsRunning() async throws {
+        let folders = try TemporaryWorkspaceFolders(count: 1)
+        defer { folders.remove() }
+        let launcher = RecordingWorkspaceLauncher(suspendLaunches: true)
+        let coordinator = makeCoordinator(launcher: launcher)
+        coordinator.receive(folders.urls)
+
+        let firstLaunch = Task {
+            await coordinator.launch(in: .terminal)
+        }
+        while launcher.launchRequests.isEmpty {
+            await Task.yield()
+        }
+
+        let secondLaunch = Task {
+            await coordinator.launch(in: .visualStudioCode)
+        }
+        await Task.yield()
+
+        #expect(launcher.launchRequests == [
+            .init(folders: folders.urls.map(\.standardizedFileURL), target: .terminal),
+        ])
+
+        launcher.finishSuspendedLaunches()
+        await firstLaunch.value
+        await secondLaunch.value
+    }
+
+    @Test @MainActor
     func failedLaunchKeepsPendingFoldersForRetry() async throws {
         let folders = try TemporaryWorkspaceFolders(count: 1)
         defer { folders.remove() }
@@ -146,6 +175,22 @@ struct WorkspaceOpenCoordinatorTests {
     }
 
     @Test @MainActor
+    func terminalScriptFailurePreservesItsReadableMessage() async throws {
+        let folders = try TemporaryWorkspaceFolders(count: 1)
+        defer { folders.remove() }
+        let launcher = RecordingWorkspaceLauncher(
+            error: TerminalLaunchError.scriptFailed("终端返回了启动错误")
+        )
+        let coordinator = makeCoordinator(launcher: launcher)
+        coordinator.receive(folders.urls)
+
+        await coordinator.launch(in: .terminal)
+
+        #expect(coordinator.status == .failed(.terminal, message: "终端返回了启动错误"))
+        #expect(coordinator.statusText == "无法使用 终端 打开：终端返回了启动错误")
+    }
+
+    @Test @MainActor
     func availabilityAndResetAreExposedToTheView() throws {
         let folders = try TemporaryWorkspaceFolders(count: 1)
         defer { folders.remove() }
@@ -187,15 +232,19 @@ private final class RecordingWorkspaceLauncher: WorkspaceLaunching {
 
     let availableTargets: Set<WorkspaceTarget>
     let error: Error?
+    let suspendLaunches: Bool
     var launchRequests: [LaunchRequest] = []
     var onLaunch: (() -> Void)?
+    private var continuations: [CheckedContinuation<Void, Never>] = []
 
     init(
         availableTargets: Set<WorkspaceTarget> = Set(WorkspaceTarget.allCases),
-        error: Error? = nil
+        error: Error? = nil,
+        suspendLaunches: Bool = false
     ) {
         self.availableTargets = availableTargets
         self.error = error
+        self.suspendLaunches = suspendLaunches
     }
 
     func isAvailable(_ target: WorkspaceTarget) -> Bool {
@@ -205,8 +254,21 @@ private final class RecordingWorkspaceLauncher: WorkspaceLaunching {
     func launch(folders: [URL], in target: WorkspaceTarget) async throws {
         launchRequests.append(.init(folders: folders, target: target))
         onLaunch?()
+        if suspendLaunches {
+            await withCheckedContinuation { continuation in
+                continuations.append(continuation)
+            }
+        }
         if let error {
             throw error
+        }
+    }
+
+    func finishSuspendedLaunches() {
+        let activeContinuations = continuations
+        continuations.removeAll()
+        for continuation in activeContinuations {
+            continuation.resume()
         }
     }
 }

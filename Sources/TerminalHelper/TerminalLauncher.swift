@@ -46,9 +46,18 @@ protocol TerminalLaunching {
     func open(directory: URL) throws
 }
 
-enum TerminalLaunchError: Error, Equatable {
+enum TerminalLaunchError: Error, Equatable, LocalizedError {
     case automationPermissionDenied
     case scriptFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .automationPermissionDenied:
+            "未获授权控制终端"
+        case let .scriptFailed(message):
+            message
+        }
+    }
 }
 
 struct TerminalLauncher: TerminalLaunching {

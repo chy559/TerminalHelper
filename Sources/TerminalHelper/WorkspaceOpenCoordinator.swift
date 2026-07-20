@@ -51,6 +51,7 @@ final class WorkspaceOpenCoordinator: ObservableObject, FolderReceiving {
 
     func launch(in target: WorkspaceTarget) async {
         guard !pendingFolders.isEmpty else { return }
+        if case .launching = status { return }
 
         guard launcher.isAvailable(target) else {
             status = .failed(
