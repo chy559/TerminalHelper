@@ -13,6 +13,7 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
     private ImmutableArray<string> pendingFolders = [];
     private WorkspaceStatus status = new WorkspaceStatus.Idle();
     private long selectionVersion;
+    private long pendingFoldersVersion;
     private int launchInProgress;
 
     public WorkspaceOpenCoordinator(FolderBatchPlanner folderBatchPlanner, IWorkspaceLauncher launcher)
@@ -39,11 +40,22 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
             return;
         }
 
+        long receivedSelectionVersion;
+        lock (stateGate)
+        {
+            receivedSelectionVersion = ++selectionVersion;
+        }
+
         var plan = folderBatchPlanner.MakePlan(paths);
         lock (stateGate)
         {
-            selectionVersion++;
+            if (selectionVersion != receivedSelectionVersion)
+            {
+                return;
+            }
+
             pendingFolders = plan.ValidFolders;
+            pendingFoldersVersion = receivedSelectionVersion;
             OnPropertyChanged(nameof(PendingFolders));
             SetStatus(new WorkspaceStatus.Ready(new(pendingFolders.Length, plan.Failures.Length)));
         }
@@ -55,6 +67,7 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
         {
             selectionVersion++;
             pendingFolders = [];
+            pendingFoldersVersion = selectionVersion;
             OnPropertyChanged(nameof(PendingFolders));
             SetStatus(new WorkspaceStatus.Idle());
         }
@@ -79,13 +92,22 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
 
             lock (stateGate)
             {
-                if (pendingFolders.IsEmpty)
+                if (pendingFolders.IsEmpty || pendingFoldersVersion != selectionVersion)
                 {
                     return;
                 }
 
                 folders = pendingFolders;
                 launchSelectionVersion = selectionVersion;
+
+                if (!launcher.IsAvailable(target))
+                {
+                    SetStatus(new WorkspaceStatus.Failed(
+                        target,
+                        $"未找到 {target.GetDisplayName()}，请先安装后重试"));
+                    return;
+                }
+
                 SetStatus(new WorkspaceStatus.Launching(target));
             }
 
@@ -114,6 +136,7 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
                 }
 
                 pendingFolders = [];
+                pendingFoldersVersion = selectionVersion;
                 OnPropertyChanged(nameof(PendingFolders));
                 SetStatus(new WorkspaceStatus.Completed(target, folders.Count));
             }

@@ -60,6 +60,26 @@ public sealed class WorkspaceOpenCoordinatorTests
     }
 
     [TestMethod]
+    public async Task LaunchAsync_UnavailableTargetFailsWithoutLaunchingAndRetainsSelection()
+    {
+        launcher.AvailableTargets.Remove(WorkspaceTarget.VisualStudioCode);
+        coordinator.Receive(["first"]);
+
+        await coordinator.LaunchAsync(WorkspaceTarget.VisualStudioCode);
+
+        Assert.IsEmpty(launcher.Launches);
+        CollectionAssert.AreEqual(new[] { @"C:\\First" }, coordinator.PendingFolders.ToArray());
+        Assert.AreEqual(
+            new WorkspaceStatus.Failed(
+                WorkspaceTarget.VisualStudioCode,
+                "未找到 Visual Studio Code，请先安装后重试"),
+            coordinator.Status);
+        Assert.AreEqual(
+            "无法使用 Visual Studio Code 打开：未找到 Visual Studio Code，请先安装后重试",
+            coordinator.StatusText);
+    }
+
+    [TestMethod]
     public void Receive_EmptyInputLeavesTheExistingSelectionUnchanged()
     {
         coordinator.Receive(["first"]);
@@ -131,9 +151,40 @@ public sealed class WorkspaceOpenCoordinatorTests
         Assert.AreEqual("已选择 1 个文件夹", coordinator.StatusText);
     }
 
-    private static FolderBatchPlanner CreatePlanner()
+    [TestMethod]
+    public async Task Receive_NewSelectionPlanningPreventsOldLaunchCompletionOrRelaunch()
     {
-        return new FolderBatchPlanner(new FakeFolderPathService());
+        var paths = new BlockingFolderPathService();
+        coordinator = new WorkspaceOpenCoordinator(CreatePlanner(paths), launcher);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        launcher.PendingLaunch = completion;
+        coordinator.Receive(["first"]);
+
+        var oldLaunch = coordinator.LaunchAsync(WorkspaceTarget.Terminal);
+        var receivingNewSelection = Task.Run(() => coordinator.Receive(["delayed"]));
+        Assert.IsTrue(paths.WaitForDelayedPlanning(TimeSpan.FromSeconds(5)));
+
+        completion.SetResult();
+        await oldLaunch;
+
+        CollectionAssert.AreEqual(new[] { @"C:\\First" }, coordinator.PendingFolders.ToArray());
+        Assert.IsNotInstanceOfType<WorkspaceStatus.Completed>(coordinator.Status);
+
+        await coordinator.LaunchAsync(WorkspaceTarget.VisualStudioCode);
+
+        Assert.AreEqual(1, launcher.Launches.Count);
+        CollectionAssert.AreEqual(new[] { @"C:\\First" }, coordinator.PendingFolders.ToArray());
+
+        paths.CompleteDelayedPlanning();
+        await receivingNewSelection;
+
+        CollectionAssert.AreEqual(new[] { @"C:\\Delayed" }, coordinator.PendingFolders.ToArray());
+        Assert.AreEqual(new WorkspaceStatus.Ready(new WorkspaceSummary(1, 0)), coordinator.Status);
+    }
+
+    private static FolderBatchPlanner CreatePlanner(IFolderPathService? paths = null)
+    {
+        return new FolderBatchPlanner(paths ?? new FakeFolderPathService());
     }
 
     private sealed class FakeFolderPathService : IFolderPathService
@@ -192,6 +243,43 @@ public sealed class WorkspaceOpenCoordinatorTests
             {
                 throw Error;
             }
+        }
+    }
+
+    private sealed class BlockingFolderPathService : IFolderPathService
+    {
+        private readonly ManualResetEventSlim delayedPlanningStarted = new();
+        private readonly ManualResetEventSlim completeDelayedPlanning = new();
+
+        public string GetFullPath(string path)
+        {
+            if (path == "delayed")
+            {
+                delayedPlanningStarted.Set();
+                completeDelayedPlanning.Wait();
+                return @"C:\\Delayed";
+            }
+
+            return path switch
+            {
+                "first" => @"C:\\First",
+                _ => throw new KeyNotFoundException(path),
+            };
+        }
+
+        public bool DirectoryExists(string path)
+        {
+            return true;
+        }
+
+        public bool WaitForDelayedPlanning(TimeSpan timeout)
+        {
+            return delayedPlanningStarted.Wait(timeout);
+        }
+
+        public void CompleteDelayedPlanning()
+        {
+            completeDelayedPlanning.Set();
         }
     }
 }
