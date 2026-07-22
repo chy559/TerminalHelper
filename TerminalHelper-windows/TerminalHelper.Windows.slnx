@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/TerminalHelper.Core/TerminalHelper.Core.csproj" />
+  <Project Path="tests/TerminalHelper.Core.Tests/TerminalHelper.Core.Tests.csproj" />
+</Solution>
