@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
 
         InitializeComponent();
         Title = "Terminal Helper";
+        TrySetWindowIcon();
 
         DropRoot.Loaded += DropRoot_Loaded;
         ViewModel.StateChanged += ViewModel_StateChanged;
@@ -31,6 +32,23 @@ public sealed partial class MainWindow : Window
     }
 
     public MainWindowViewModel ViewModel { get; }
+
+    private void TrySetWindowIcon()
+    {
+        try
+        {
+            var windowHandle = WindowNative.GetWindowHandle(this);
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(windowHandle);
+            var appWindow = AppWindow.GetFromWindowId(windowId);
+            var iconPath = Path.GetFullPath(
+                Path.Combine(AppContext.BaseDirectory, "Assets", "TerminalHelper.ico"));
+            appWindow.SetIcon(iconPath);
+        }
+        catch (Exception)
+        {
+            // The icon is cosmetic; a missing or unsupported icon must not prevent startup.
+        }
+    }
 
     private void DropRoot_Loaded(object sender, RoutedEventArgs args)
     {

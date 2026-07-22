@@ -9,6 +9,7 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\TerminalHelper.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" />
@@ -17,5 +18,19 @@
     <ProjectReference Include="../TerminalHelper.Core/TerminalHelper.Core.csproj" />
     <ProjectReference Include="../TerminalHelper.Presentation/TerminalHelper.Presentation.csproj" />
     <ProjectReference Include="../TerminalHelper.WindowsPlatform/TerminalHelper.WindowsPlatform.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\TerminalHelper.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Assets\Square44x44Logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Assets\Square150x150Logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 </Project>
