@@ -1,37 +1,10 @@
 # Terminal Helper
 
-Terminal Helper 是一个原生 macOS 小工具：把一个或多个文件夹拖入窗口或 Dock 图标，再选择使用系统“终端”、Visual Studio Code 或 IntelliJ IDEA 打开。
+Terminal Helper 在同一个仓库中分别维护 macOS 和 Windows 版本。
 
-应用使用专属的“文件夹 + `>_`”图标；1024 像素主图保存在 `Resources/AppIcon/TerminalHelper-1024.png`，构建时会将编译后的 `Resources/TerminalHelper.icns` 打包进应用。
+## 项目目录
 
-## 系统要求
+- [`TerminalHelper-mac/`](TerminalHelper-mac/)：已经完成并可使用的原生 macOS 版本。
+- [`TerminalHelper-windows/`](TerminalHelper-windows/)：Windows 版本的独立开发目录。
 
-- macOS 13.0 或更高版本
-- 用命令行构建时需要兼容 Swift 6 的 Apple Command Line Tools 或 Xcode 工具链
-
-## 测试、构建与启动
-
-在仓库根目录运行：
-
-```bash
-./scripts/test.sh
-./scripts/build-app.sh
-open "dist/Terminal Helper.app"
-```
-
-构建脚本会生成并临时签名 `dist/Terminal Helper.app`。也可以直接在 Xcode 中打开 `Package.swift` 来查看、构建或运行项目。
-
-## 使用方法
-
-- **窗口拖放：** 将文件夹拖到 Terminal Helper 窗口中的虚线区域，然后从“终端”、Visual Studio Code 或 IntelliJ IDEA 中选择一个打开方式。
-- **Dock 拖放：** 先让 Terminal Helper 保留在 Dock 中，再将文件夹拖到它的 Dock 图标上；应用窗口会显示打开方式供选择。
-- **多个文件夹：** 一次拖入多个文件夹时，全部有效文件夹会交给同一个所选应用。终端会按顺序为每个文件夹打开一个新窗口。
-- **编辑器检测：** 未安装的 Visual Studio Code 或 IntelliJ IDEA 会显示“未安装”并禁用；IntelliJ IDEA Ultimate 和 Community Edition 均受支持。
-- **重新选择：** 再次拖入文件夹会替换当前选择；启动失败时会保留选择，方便重试或改用其他应用。
-- **混合内容：** 文件或无效路径不会打开，其余有效文件夹仍会保留供选择。
-
-## 自动化权限
-
-首次打开文件夹时，macOS 会询问是否允许 Terminal Helper 控制“终端”。请选择“允许”。如果曾经拒绝，前往“系统设置”→“隐私与安全性”→“自动化”，找到 Terminal Helper 并启用对“终端”的访问，然后重新尝试。
-
-仓库中的自动化测试使用记录器替代真实的“终端”控制，不会弹出权限提示或打开“终端”窗口。
+两个平台项目彼此独立。macOS 版本的构建、测试和使用说明位于 [`TerminalHelper-mac/README.md`](TerminalHelper-mac/README.md)。
