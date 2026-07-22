@@ -103,6 +103,24 @@ public sealed class MainWindowViewModelTests
         Assert.IsGreaterThan(0, eventCount);
     }
 
+    [TestMethod]
+    public void Selection_ProjectsFolderCountForTheWindowHeader()
+    {
+        viewModel.Receive(["first", "second"]);
+
+        Assert.AreEqual(2, viewModel.SelectedFolderCount);
+    }
+
+    [TestMethod]
+    public async Task FailedLaunch_ProjectsErrorStatusForTheWindowBrush()
+    {
+        viewModel.Receive(["first"]);
+
+        await viewModel.LaunchAsync(WorkspaceTarget.IntelliJIdea);
+
+        Assert.IsTrue(viewModel.HasError);
+    }
+
     private sealed class FakeFolderPathService : IFolderPathService
     {
         public string GetFullPath(string path)

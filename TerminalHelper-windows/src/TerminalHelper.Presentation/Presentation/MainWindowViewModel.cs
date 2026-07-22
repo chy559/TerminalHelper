@@ -26,7 +26,11 @@ public sealed class MainWindowViewModel
 
     public bool HasSelection => coordinator.PendingFolders.Count > 0;
 
+    public int SelectedFolderCount => coordinator.PendingFolders.Count;
+
     public string StatusText => coordinator.StatusText;
+
+    public bool HasError => coordinator.Status is WorkspaceStatus.Failed;
 
     public bool IsLaunching => coordinator.Status is WorkspaceStatus.Launching;
 

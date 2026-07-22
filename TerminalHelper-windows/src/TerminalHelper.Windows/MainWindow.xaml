@@ -1,0 +1,213 @@
+<Window
+    x:Class="TerminalHelper.Windows.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid
+        x:Name="DropRoot"
+        AllowDrop="True"
+        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+        DragLeave="DropRoot_DragLeave"
+        DragOver="DropRoot_DragOver"
+        Drop="DropRoot_Drop">
+        <Grid Margin="24">
+            <Border
+                x:Name="DropSurface"
+                Padding="24"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                CornerRadius="18">
+                <Grid>
+                    <Grid x:Name="EmptyState">
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="12">
+                            <FontIcon
+                                HorizontalAlignment="Center"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="42"
+                                Glyph="&#xE8B7;" />
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                FontSize="24"
+                                FontWeight="SemiBold"
+                                Text="拖入文件夹" />
+                            <TextBlock
+                                x:Name="EmptyStatusText"
+                                MaxWidth="330"
+                                HorizontalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="拖入文件夹，然后选择打开方式"
+                                TextAlignment="Center"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                x:Name="EmptyErrorStatusText"
+                                MaxWidth="330"
+                                HorizontalAlignment="Center"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                TextAlignment="Center"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid x:Name="SelectedState" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock
+                                x:Name="SelectionCountText"
+                                FontSize="22"
+                                FontWeight="SemiBold"
+                                Text="已选择 0 个文件夹" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="选择一个打开方式" />
+                        </StackPanel>
+
+                        <StackPanel
+                            Grid.Row="1"
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <Button
+                                x:Name="TerminalButton"
+                                Height="48"
+                                Padding="0"
+                                AutomationProperties.Name="Terminal"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                Click="TerminalButton_Click"
+                                CornerRadius="12"
+                                HorizontalContentAlignment="Stretch"
+                                IsTabStop="True"
+                                TabIndex="0">
+                                <Grid Padding="14,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="24" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" FontSize="18" Glyph="&#xE756;" />
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="Terminal" />
+                                    <ProgressRing x:Name="TerminalProgress" Grid.Column="2" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                                    <TextBlock x:Name="TerminalUnavailable" Grid.Column="2" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="未安装" Visibility="Collapsed" />
+                                    <FontIcon x:Name="TerminalChevron" Grid.Column="3" FontFamily="Segoe Fluent Icons" FontSize="12" Glyph="&#xE76C;" />
+                                </Grid>
+                            </Button>
+
+                            <Button
+                                x:Name="VisualStudioCodeButton"
+                                Height="48"
+                                Padding="0"
+                                AutomationProperties.Name="Visual Studio Code"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                Click="VisualStudioCodeButton_Click"
+                                CornerRadius="12"
+                                HorizontalContentAlignment="Stretch"
+                                IsTabStop="True"
+                                TabIndex="1">
+                                <Grid Padding="14,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="24" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" FontSize="18" Glyph="&#xE943;" />
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="Visual Studio Code" />
+                                    <ProgressRing x:Name="VisualStudioCodeProgress" Grid.Column="2" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                                    <TextBlock x:Name="VisualStudioCodeUnavailable" Grid.Column="2" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="未安装" Visibility="Collapsed" />
+                                    <FontIcon x:Name="VisualStudioCodeChevron" Grid.Column="3" FontFamily="Segoe Fluent Icons" FontSize="12" Glyph="&#xE76C;" />
+                                </Grid>
+                            </Button>
+
+                            <Button
+                                x:Name="IntelliJIdeaButton"
+                                Height="48"
+                                Padding="0"
+                                AutomationProperties.Name="IntelliJ IDEA"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                Click="IntelliJIdeaButton_Click"
+                                CornerRadius="12"
+                                HorizontalContentAlignment="Stretch"
+                                IsTabStop="True"
+                                TabIndex="2">
+                                <Grid Padding="14,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="24" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" FontSize="18" Glyph="&#xE943;" />
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="IntelliJ IDEA" />
+                                    <ProgressRing x:Name="IntelliJIdeaProgress" Grid.Column="2" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                                    <TextBlock x:Name="IntelliJIdeaUnavailable" Grid.Column="2" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="未安装" Visibility="Collapsed" />
+                                    <FontIcon x:Name="IntelliJIdeaChevron" Grid.Column="3" FontFamily="Segoe Fluent Icons" FontSize="12" Glyph="&#xE76C;" />
+                                </Grid>
+                            </Button>
+                        </StackPanel>
+
+                        <Grid Grid.Row="2" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                x:Name="SelectedStatusText"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                x:Name="SelectedErrorStatusText"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <Button
+                                x:Name="ResetButton"
+                                Grid.Column="1"
+                                AutomationProperties.Name="重新选择文件夹"
+                                Click="ResetButton_Click"
+                                Content="重新选择文件夹"
+                                TabIndex="3" />
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border
+                x:Name="DropTargetHighlight"
+                Background="{ThemeResource AccentFillColorSecondaryBrush}"
+                CornerRadius="18"
+                IsHitTestVisible="False"
+                Opacity="0.18"
+                Visibility="Collapsed" />
+
+            <Rectangle
+                x:Name="DropOutline"
+                IsHitTestVisible="False"
+                RadiusX="18"
+                RadiusY="18"
+                Stroke="{ThemeResource ControlStrokeColorDefaultBrush}"
+                StrokeDashArray="7,7"
+                StrokeThickness="2" />
+
+            <Rectangle
+                x:Name="DropTargetOutline"
+                IsHitTestVisible="False"
+                RadiusX="18"
+                RadiusY="18"
+                Stroke="{ThemeResource AccentFillColorDefaultBrush}"
+                StrokeDashArray="7,7"
+                StrokeThickness="2"
+                Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</Window>
