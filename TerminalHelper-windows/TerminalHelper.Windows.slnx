@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="src/TerminalHelper.Core/TerminalHelper.Core.csproj" />
+  <Project Path="src/TerminalHelper.WindowsPlatform/TerminalHelper.WindowsPlatform.csproj" />
   <Project Path="tests/TerminalHelper.Core.Tests/TerminalHelper.Core.Tests.csproj" />
+  <Project Path="tests/TerminalHelper.WindowsPlatform.Tests/TerminalHelper.WindowsPlatform.Tests.csproj" />
 </Solution>
