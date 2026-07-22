@@ -7,6 +7,7 @@
     <PackageReference Include="MSTest" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/TerminalHelper.Presentation/TerminalHelper.Presentation.csproj" />
     <ProjectReference Include="../../src/TerminalHelper.WindowsPlatform/TerminalHelper.WindowsPlatform.csproj" />
   </ItemGroup>
 </Project>

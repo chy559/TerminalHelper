@@ -53,6 +53,7 @@ TerminalHelper-windows/
 ├── global.json
 ├── src/
 │   ├── TerminalHelper.Core/
+│   ├── TerminalHelper.Presentation/
 │   ├── TerminalHelper.WindowsPlatform/
 │   └── TerminalHelper.Windows/
 ├── tests/
@@ -75,6 +76,18 @@ TerminalHelper-windows/
 - `WorkspaceOpenCoordinator`：接收批次、选择目标、状态转换、成功清空、失败保留、重复启动保护与选择版本保护。
 - `IWorkspaceLauncher`、`IPathInspector` 等可替换边界。
 
+### TerminalHelper.Presentation
+
+目标框架为 `net10.0`，不引用 WinUI 或 Windows API，因此视图模型与启动参数适配器可在 macOS 开发机运行测试。
+
+职责：
+
+- 将 `WorkspaceOpenCoordinator` 投影为窗口需要的选择、状态、启动进度和目标可用性属性。
+- 保持 Terminal、Visual Studio Code、IntelliJ IDEA 的固定展示顺序，并提供单一 `StateChanged` 绑定刷新事件。
+- 从进程参数中仅移除索引零的可执行文件，原样保留后续路径参数。
+
+该项目是 WinUI 自包含 `win-x64` 可执行项目与跨平台测试之间的测试性边界；命名空间仍使用 `TerminalHelper.Windows.Presentation` 与 `TerminalHelper.Windows.Input`，窗口层无需感知项目拆分。
+
 ### TerminalHelper.WindowsPlatform
 
 目标框架为 `net10.0-windows10.0.22000.0`。
@@ -93,7 +106,7 @@ TerminalHelper-windows/
 职责：
 
 - WinUI 3 XAML 界面与窗口生命周期。
-- 从拖放数据和进程命令行参数提取本地路径。
+- 从拖放数据提取本地路径，并把启动参数交给 `TerminalHelper.Presentation` 适配器。
 - 将用户操作转发给协调器，并渲染其状态。
 - 应用图标、主题、窗口尺寸、键盘和无障碍行为。
 
@@ -202,11 +215,12 @@ VS Code 会把多个文件夹参数组成多根工作区。
 ### macOS 本地可执行
 
 - `TerminalHelper.Core.Tests`：规划器、状态机、错误文案、重复启动与迟到完成保护。
+- `TerminalHelper.WindowsPlatform.Tests` 中的平台中立 presentation/input 测试：目标投影、启动进度、重置和启动参数保真。
 - Core 构建与格式检查。
 
 ### Windows CI/开发机
 
-- `TerminalHelper.WindowsPlatform.Tests`：每种发现来源、优先级、路径参数、目标不可用与进程失败。
+- `TerminalHelper.WindowsPlatform.Tests`：每种发现来源、优先级、路径参数、目标不可用与进程失败；同一测试项目中的 presentation/input 测试也在 Windows 重跑。
 - 整个解决方案还原、编译、测试与 `win-x64` 发布。
 - 便携 ZIP 结构与 SHA-256 生成脚本测试。
 

@@ -1,5 +1,11 @@
 <Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
   <Project Path="src/TerminalHelper.Core/TerminalHelper.Core.csproj" />
+  <Project Path="src/TerminalHelper.Presentation/TerminalHelper.Presentation.csproj" />
+  <Project Path="src/TerminalHelper.Windows/TerminalHelper.Windows.csproj" />
   <Project Path="src/TerminalHelper.WindowsPlatform/TerminalHelper.WindowsPlatform.csproj" />
   <Project Path="tests/TerminalHelper.Core.Tests/TerminalHelper.Core.Tests.csproj" />
   <Project Path="tests/TerminalHelper.WindowsPlatform.Tests/TerminalHelper.WindowsPlatform.Tests.csproj" />
