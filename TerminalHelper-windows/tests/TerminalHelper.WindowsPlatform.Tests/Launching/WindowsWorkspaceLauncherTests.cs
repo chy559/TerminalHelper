@@ -69,8 +69,9 @@ public sealed class WindowsWorkspaceLauncherTests
     {
         resolver.Executables[WorkspaceTarget.VisualStudioCode] =
             new(WorkspaceTarget.VisualStudioCode, @"C:\\VS Code\\Code.exe");
+        const string privateCommand = "SECRET_COMMAND";
         runner.Failure = new InvalidOperationException(
-            "C:\\VS Code\\Code.exe --new-window C:\\Private Folder");
+            $"C:\\VS Code\\Code.exe --new-window C:\\Private Folder {privateCommand}");
 
         var exception = await Assert.ThrowsAsync<WorkspaceLaunchException>(() => launcher.LaunchAsync(
             [@"C:\\Private Folder"],
@@ -78,8 +79,43 @@ public sealed class WindowsWorkspaceLauncherTests
             CancellationToken.None));
 
         Assert.Contains(WorkspaceTarget.VisualStudioCode.GetDisplayName(), exception.Message);
-        Assert.DoesNotContain("Code.exe", exception.Message);
-        Assert.DoesNotContain("Private Folder", exception.Message);
+        Assert.IsNull(exception.InnerException);
+        foreach (var sensitiveText in new[] { "Code.exe", "Private Folder", privateCommand })
+        {
+            Assert.DoesNotContain(sensitiveText, exception.Message);
+            Assert.DoesNotContain(sensitiveText, exception.ToString());
+        }
+    }
+
+    [TestMethod]
+    public async Task LaunchAsync_AlreadyCancelledDoesNotResolveOrRunAndPropagatesCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await launcher.LaunchAsync(
+            [@"C:\\Folder"],
+            WorkspaceTarget.Terminal,
+            cancellation.Token));
+
+        Assert.AreEqual(0, resolver.ResolveCalls);
+        Assert.IsEmpty(runner.Requests);
+    }
+
+    [TestMethod]
+    public async Task LaunchAsync_CancellationAfterFirstRequestStopsLaterRequestsAndPropagates()
+    {
+        resolver.Executables[WorkspaceTarget.Terminal] =
+            new(WorkspaceTarget.Terminal, @"C:\\Tools\\wt.exe");
+        using var cancellation = new CancellationTokenSource();
+        runner.AfterStart = cancellation.Cancel;
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => launcher.LaunchAsync(
+            [@"C:\\First", @"C:\\Second"],
+            WorkspaceTarget.Terminal,
+            cancellation.Token));
+
+        Assert.AreEqual(1, runner.Requests.Count);
     }
 
     [TestMethod]
@@ -115,6 +151,8 @@ public sealed class WindowsWorkspaceLauncherTests
 
         public int? FailureAtRequest { get; set; }
 
+        public Action? AfterStart { get; set; }
+
         public void Start(ProcessLaunchRequest request)
         {
             if (Failure is not null || FailureAtRequest == Requests.Count + 1)
@@ -123,6 +161,7 @@ public sealed class WindowsWorkspaceLauncherTests
             }
 
             Requests.Add(request);
+            AfterStart?.Invoke();
         }
     }
 }

@@ -52,11 +52,10 @@ public sealed class WindowsWorkspaceLauncher : IWorkspaceLauncher
         {
             return Task.FromCanceled(cancellationToken);
         }
-        catch (Exception exception)
+        catch (Exception)
         {
             return Task.FromException(new WorkspaceLaunchException(
-                $"无法使用 {target.GetDisplayName()} 打开。",
-                exception));
+                $"无法使用 {target.GetDisplayName()} 打开。"));
         }
     }
 }
