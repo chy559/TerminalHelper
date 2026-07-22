@@ -111,6 +111,8 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
                 SetStatus(new WorkspaceStatus.Launching(target));
             }
 
+            await Task.Yield();
+
             try
             {
                 await launcher.LaunchAsync(folders, target, cancellationToken).ConfigureAwait(false);

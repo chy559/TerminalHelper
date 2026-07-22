@@ -15,6 +15,7 @@ namespace TerminalHelper.Windows;
 public sealed partial class MainWindow : Window
 {
     private bool isClosed;
+    private XamlRoot? xamlRoot;
 
     public MainWindow(MainWindowViewModel viewModel)
     {
@@ -22,8 +23,8 @@ public sealed partial class MainWindow : Window
 
         InitializeComponent();
         Title = "Terminal Helper";
-        ResizeWindow();
 
+        DropRoot.Loaded += DropRoot_Loaded;
         ViewModel.StateChanged += ViewModel_StateChanged;
         Closed += MainWindow_Closed;
         Render();
@@ -31,16 +32,45 @@ public sealed partial class MainWindow : Window
 
     public MainWindowViewModel ViewModel { get; }
 
-    private void ResizeWindow()
+    private void DropRoot_Loaded(object sender, RoutedEventArgs args)
     {
+        DropRoot.Loaded -= DropRoot_Loaded;
+        if (isClosed || DropRoot.XamlRoot is not XamlRoot root)
+        {
+            return;
+        }
+
+        xamlRoot = root;
+        xamlRoot.Changed += XamlRoot_Changed;
+        ResizeWindow(xamlRoot.RasterizationScale);
+    }
+
+    private void XamlRoot_Changed(XamlRoot sender, XamlRootChangedEventArgs args)
+    {
+        if (!isClosed)
+        {
+            ResizeWindow(sender.RasterizationScale);
+        }
+    }
+
+    private void ResizeWindow(double rasterizationScale)
+    {
+        var size = WindowSizeCalculator.ForRasterizationScale(rasterizationScale);
         var windowHandle = WindowNative.GetWindowHandle(this);
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(windowHandle);
-        AppWindow.GetFromWindowId(windowId).Resize(new SizeInt32(500, 440));
+        AppWindow.GetFromWindowId(windowId).Resize(new SizeInt32(size.Width, size.Height));
     }
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         isClosed = true;
+        DropRoot.Loaded -= DropRoot_Loaded;
+        if (xamlRoot is not null)
+        {
+            xamlRoot.Changed -= XamlRoot_Changed;
+            xamlRoot = null;
+        }
+
         ViewModel.StateChanged -= ViewModel_StateChanged;
         Closed -= MainWindow_Closed;
     }
@@ -137,21 +167,36 @@ public sealed partial class MainWindow : Window
         SetDropTargeted(false);
         args.Handled = true;
 
-        if (!args.DataView.Contains(StandardDataFormats.StorageItems))
+        try
         {
-            return;
-        }
+            if (!args.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                return;
+            }
 
-        var items = await args.DataView.GetStorageItemsAsync();
-        if (isClosed)
+            var items = await args.DataView.GetStorageItemsAsync();
+            if (isClosed)
+            {
+                return;
+            }
+
+            var folderPaths = items
+                .OfType<StorageFolder>()
+                .Select(folder => folder.Path)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .ToArray();
+
+            if (!isClosed)
+            {
+                ViewModel.Receive(folderPaths);
+            }
+        }
+        catch (OperationCanceledException)
         {
-            return;
         }
-
-        ViewModel.Receive(items
-            .OfType<StorageFolder>()
-            .Select(folder => folder.Path)
-            .Where(path => !string.IsNullOrWhiteSpace(path)));
+        catch (Exception)
+        {
+        }
     }
 
     private void SetDropTargeted(bool isTargeted)

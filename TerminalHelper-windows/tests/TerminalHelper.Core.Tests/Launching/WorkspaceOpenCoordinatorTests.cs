@@ -123,6 +123,8 @@ public sealed class WorkspaceOpenCoordinatorTests
         var firstLaunch = coordinator.LaunchAsync(WorkspaceTarget.Terminal);
         var secondLaunch = coordinator.LaunchAsync(WorkspaceTarget.Terminal);
 
+        await launcher.LaunchStarted.Task;
+
         Assert.AreEqual(1, launcher.Launches.Count);
         Assert.AreEqual(new WorkspaceStatus.Launching(WorkspaceTarget.Terminal), coordinator.Status);
         Assert.AreEqual("正在使用 Terminal 打开…", coordinator.StatusText);
@@ -131,6 +133,35 @@ public sealed class WorkspaceOpenCoordinatorTests
         await Task.WhenAll(firstLaunch, secondLaunch);
 
         Assert.AreEqual(new WorkspaceStatus.Completed(WorkspaceTarget.Terminal, 1), coordinator.Status);
+    }
+
+    [TestMethod]
+    public async Task LaunchAsync_PublishesLaunchingForOneUiTurnBeforeSynchronousLauncherRuns()
+    {
+        var context = new PumpSynchronizationContext();
+        var previousContext = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(context);
+
+        try
+        {
+            coordinator.Receive(["first"]);
+
+            var launch = coordinator.LaunchAsync(WorkspaceTarget.Terminal);
+
+            Assert.AreEqual(new WorkspaceStatus.Launching(WorkspaceTarget.Terminal), coordinator.Status);
+            Assert.IsEmpty(launcher.Launches);
+            Assert.IsFalse(launch.IsCompleted);
+
+            Assert.IsTrue(context.RunOne());
+            await launch;
+
+            Assert.AreEqual(1, launcher.Launches.Count);
+            Assert.AreEqual(new WorkspaceStatus.Completed(WorkspaceTarget.Terminal, 1), coordinator.Status);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
     }
 
     [TestMethod]
@@ -219,6 +250,9 @@ public sealed class WorkspaceOpenCoordinatorTests
 
         public List<(IReadOnlyList<string> Folders, WorkspaceTarget Target)> Launches { get; } = [];
 
+        public TaskCompletionSource LaunchStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public Exception? Error { get; set; }
 
         public TaskCompletionSource? PendingLaunch { get; set; }
@@ -234,6 +268,7 @@ public sealed class WorkspaceOpenCoordinatorTests
             CancellationToken cancellationToken)
         {
             Launches.Add((folders, target));
+            LaunchStarted.TrySetResult();
             if (PendingLaunch is not null)
             {
                 await PendingLaunch.Task.WaitAsync(cancellationToken);
@@ -280,6 +315,27 @@ public sealed class WorkspaceOpenCoordinatorTests
         public void CompleteDelayedPlanning()
         {
             completeDelayedPlanning.Set();
+        }
+    }
+
+    private sealed class PumpSynchronizationContext : SynchronizationContext
+    {
+        private readonly Queue<(SendOrPostCallback Callback, object? State)> callbacks = new();
+
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+            callbacks.Enqueue((callback, state));
+        }
+
+        public bool RunOne()
+        {
+            if (!callbacks.TryDequeue(out var callback))
+            {
+                return false;
+            }
+
+            callback.Callback(callback.State);
+            return true;
         }
     }
 }
