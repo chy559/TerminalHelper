@@ -1,0 +1,159 @@
+using System.Collections.Immutable;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using TerminalHelper.Core.Folders;
+
+namespace TerminalHelper.Core.Launching;
+
+public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
+{
+    private readonly object stateGate = new();
+    private readonly FolderBatchPlanner folderBatchPlanner;
+    private readonly IWorkspaceLauncher launcher;
+    private ImmutableArray<string> pendingFolders = [];
+    private WorkspaceStatus status = new WorkspaceStatus.Idle();
+    private long selectionVersion;
+    private int launchInProgress;
+
+    public WorkspaceOpenCoordinator(FolderBatchPlanner folderBatchPlanner, IWorkspaceLauncher launcher)
+    {
+        this.folderBatchPlanner = folderBatchPlanner ?? throw new ArgumentNullException(nameof(folderBatchPlanner));
+        this.launcher = launcher ?? throw new ArgumentNullException(nameof(launcher));
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public IReadOnlyList<string> PendingFolders => pendingFolders;
+
+    public WorkspaceStatus Status => status;
+
+    public string StatusText => GetStatusText(status);
+
+    public void Receive(IEnumerable<string> rawPaths)
+    {
+        ArgumentNullException.ThrowIfNull(rawPaths);
+
+        var paths = rawPaths.ToArray();
+        if (paths.Length == 0)
+        {
+            return;
+        }
+
+        var plan = folderBatchPlanner.MakePlan(paths);
+        lock (stateGate)
+        {
+            selectionVersion++;
+            pendingFolders = plan.ValidFolders;
+            OnPropertyChanged(nameof(PendingFolders));
+            SetStatus(new WorkspaceStatus.Ready(new(pendingFolders.Length, plan.Failures.Length)));
+        }
+    }
+
+    public void Reset()
+    {
+        lock (stateGate)
+        {
+            selectionVersion++;
+            pendingFolders = [];
+            OnPropertyChanged(nameof(PendingFolders));
+            SetStatus(new WorkspaceStatus.Idle());
+        }
+    }
+
+    public bool IsAvailable(WorkspaceTarget target)
+    {
+        return launcher.IsAvailable(target);
+    }
+
+    public async Task LaunchAsync(WorkspaceTarget target, CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.CompareExchange(ref launchInProgress, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            IReadOnlyList<string> folders;
+            long launchSelectionVersion;
+
+            lock (stateGate)
+            {
+                if (pendingFolders.IsEmpty)
+                {
+                    return;
+                }
+
+                folders = pendingFolders;
+                launchSelectionVersion = selectionVersion;
+                SetStatus(new WorkspaceStatus.Launching(target));
+            }
+
+            try
+            {
+                await launcher.LaunchAsync(folders, target, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                lock (stateGate)
+                {
+                    if (selectionVersion == launchSelectionVersion)
+                    {
+                        SetStatus(new WorkspaceStatus.Failed(target, error.Message));
+                    }
+                }
+
+                return;
+            }
+
+            lock (stateGate)
+            {
+                if (selectionVersion != launchSelectionVersion)
+                {
+                    return;
+                }
+
+                pendingFolders = [];
+                OnPropertyChanged(nameof(PendingFolders));
+                SetStatus(new WorkspaceStatus.Completed(target, folders.Count));
+            }
+        }
+        finally
+        {
+            Volatile.Write(ref launchInProgress, 0);
+        }
+    }
+
+    private void SetStatus(WorkspaceStatus value)
+    {
+        status = value;
+        OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    private static string GetStatusText(WorkspaceStatus currentStatus)
+    {
+        return currentStatus switch
+        {
+            WorkspaceStatus.Idle => "拖入文件夹，然后选择打开方式",
+            WorkspaceStatus.Ready { Summary.FolderCount: 0 } ready =>
+                $"未找到可打开的文件夹（{ready.Summary.InvalidCount} 项无效）",
+            WorkspaceStatus.Ready ready when ready.Summary.InvalidCount == 0 =>
+                $"已选择 {ready.Summary.FolderCount} 个文件夹",
+            WorkspaceStatus.Ready ready =>
+                $"已选择 {ready.Summary.FolderCount} 个文件夹，{ready.Summary.InvalidCount} 项无效",
+            WorkspaceStatus.Launching launching =>
+                $"正在使用 {launching.Target.GetDisplayName()} 打开…",
+            WorkspaceStatus.Completed completed =>
+                $"已在 {completed.Target.GetDisplayName()} 中打开 {completed.Count} 个文件夹",
+            WorkspaceStatus.Failed failed =>
+                $"无法使用 {failed.Target.GetDisplayName()} 打开：{failed.Message}",
+            _ => throw new ArgumentOutOfRangeException(nameof(currentStatus), currentStatus, null),
+        };
+    }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}
