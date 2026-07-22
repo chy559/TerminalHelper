@@ -6,7 +6,7 @@ using TerminalHelper.Core.Launching;
 
 namespace TerminalHelper.WindowsPlatform.Discovery;
 
-public sealed partial class WindowsExecutableResolver
+public sealed partial class WindowsExecutableResolver : ITargetExecutableResolver
 {
     private static readonly TargetExecutable MissingExecutable = new((WorkspaceTarget)(-1), string.Empty);
     private static readonly Version MissingVersion = new(0, 0);
