@@ -4,7 +4,9 @@ public interface IWindowsFileSystem
 {
     string Combine(params string[] paths);
 
-    IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption);
+    IEnumerable<string> EnumerateDirectories(string path);
+
+    IEnumerable<string> EnumerateFiles(string path, string searchPattern);
 
     bool FileExists(string path);
 

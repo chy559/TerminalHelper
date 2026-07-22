@@ -7,12 +7,14 @@ public sealed class SystemWindowsFileSystem : IWindowsFileSystem
         return Path.Combine(paths);
     }
 
-    public IEnumerable<string> EnumerateFiles(
-        string path,
-        string searchPattern,
-        SearchOption searchOption)
+    public IEnumerable<string> EnumerateDirectories(string path)
     {
-        return Directory.EnumerateFiles(path, searchPattern, searchOption);
+        return Directory.EnumerateDirectories(path, "*", SearchOption.TopDirectoryOnly);
+    }
+
+    public IEnumerable<string> EnumerateFiles(string path, string searchPattern)
+    {
+        return Directory.EnumerateFiles(path, searchPattern, SearchOption.TopDirectoryOnly);
     }
 
     public bool FileExists(string path)

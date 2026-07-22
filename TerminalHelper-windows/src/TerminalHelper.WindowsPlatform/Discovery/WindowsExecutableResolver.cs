@@ -251,6 +251,11 @@ public sealed partial class WindowsExecutableResolver
             {
                 using var document = JsonDocument.Parse(_files.ReadAllText(metadataPath));
                 var product = document.RootElement;
+                if (product.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
                 var name = GetJsonString(product, "name") ?? GetJsonString(product, "productCode");
                 if (name is null || !IsIdeaProduct(product, name))
                 {
@@ -368,14 +373,55 @@ public sealed partial class WindowsExecutableResolver
 
     private IReadOnlyList<string> EnumerateFilesSafely(string root, string searchPattern)
     {
-        try
+        var results = new List<string>();
+        var pendingDirectories = new SortedSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            return _files.EnumerateFiles(root, searchPattern, SearchOption.AllDirectories).ToArray();
-        }
-        catch (Exception error) when (IsOptionalFileFailure(error))
+            root,
+        };
+        var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        while (pendingDirectories.Count > 0)
         {
-            return [];
+            var directory = pendingDirectories.Min!;
+            pendingDirectories.Remove(directory);
+            if (!visitedDirectories.Add(directory))
+            {
+                continue;
+            }
+
+            try
+            {
+                results.AddRange(_files
+                    .EnumerateFiles(directory, searchPattern)
+                    .Order(StringComparer.OrdinalIgnoreCase));
+            }
+            catch (Exception error) when (IsOptionalFileFailure(error))
+            {
+                // Continue traversing accessible descendants when file listing fails.
+            }
+
+            try
+            {
+                foreach (var child in _files
+                             .EnumerateDirectories(directory)
+                             .Order(StringComparer.OrdinalIgnoreCase))
+                {
+                    if (!visitedDirectories.Contains(child))
+                    {
+                        pendingDirectories.Add(child);
+                    }
+                }
+            }
+            catch (Exception error) when (IsOptionalFileFailure(error))
+            {
+                // This directory is optional; accessible siblings remain queued.
+            }
         }
+
+        return results
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private IReadOnlyList<string> GetAppPathsSafely(string executableName)
@@ -463,7 +509,8 @@ public sealed partial class WindowsExecutableResolver
 
     private static string? GetJsonString(JsonElement element, string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var property)
+        return element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var property)
             && property.ValueKind == JsonValueKind.String
                 ? property.GetString()
                 : null;

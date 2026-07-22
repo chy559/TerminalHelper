@@ -188,6 +188,32 @@ public sealed class WindowsExecutableResolverTests
     }
 
     [TestMethod]
+    [DataRow("[]")]
+    [DataRow("null")]
+    [DataRow("\"metadata\"")]
+    [DataRow("42")]
+    public void ResolveIdea_IgnoresWrongShapedToolboxJsonAndContinues(string wrongShapedJson)
+    {
+        _files.AddText(
+            @"C:\Users\Me\AppData\Local\JetBrains\Toolbox\apps\A-Wrong\product-info.json",
+            wrongShapedJson);
+        _files.AddText(
+            @"C:\Users\Me\AppData\Local\JetBrains\Toolbox\apps\B-Valid\product-info.json",
+            """
+            {
+              "productCode": "IU",
+              "version": "2026.2",
+              "launch": [{ "launcherPath": "bin\\idea64.exe" }]
+            }
+            """);
+        var expected =
+            @"C:\Users\Me\AppData\Local\JetBrains\Toolbox\apps\B-Valid\bin\idea64.exe";
+        _files.Add(expected);
+
+        Assert.AreEqual(expected, _resolver.Resolve(WorkspaceTarget.IntelliJIdea)?.Path);
+    }
+
+    [TestMethod]
     public void ResolveIdea_UsesToolboxProductCodeToPreferUltimateOverNewerCommunity()
     {
         _files.AddText(
@@ -226,6 +252,41 @@ public sealed class WindowsExecutableResolverTests
         Assert.AreEqual(
             @"C:\Program Files\JetBrains\IntelliJ IDEA 2026.2\bin\idea64.exe",
             _resolver.Resolve(WorkspaceTarget.IntelliJIdea)?.Path);
+    }
+
+    [TestMethod]
+    public void ResolveIdea_ContinuesProgramFilesScanAfterInaccessibleDescendant()
+    {
+        var blocked = @"C:\Program Files\JetBrains\A-Blocked";
+        var expected = @"C:\Program Files\JetBrains\B-Available\bin\idea64.exe";
+        _files.Add($@"{blocked}\bin\idea64.exe");
+        _files.Add(expected);
+        _files.InaccessibleRoots.Add(blocked);
+
+        Assert.AreEqual(expected, _resolver.Resolve(WorkspaceTarget.IntelliJIdea)?.Path);
+    }
+
+    [TestMethod]
+    public void ResolveIdea_ContinuesToolboxScanAfterInaccessibleDescendant()
+    {
+        var blocked =
+            @"C:\Users\Me\AppData\Local\JetBrains\Toolbox\apps\A-Blocked";
+        _files.AddText($@"{blocked}\product-info.json", "{}");
+        _files.AddText(
+            @"C:\Users\Me\AppData\Local\JetBrains\Toolbox\apps\B-Available\product-info.json",
+            """
+            {
+              "name": "IntelliJ IDEA Ultimate",
+              "version": "2026.2",
+              "launch": [{ "launcherPath": "bin\\idea64.exe" }]
+            }
+            """);
+        var expected =
+            @"C:\Users\Me\AppData\Local\JetBrains\Toolbox\apps\B-Available\bin\idea64.exe";
+        _files.Add(expected);
+        _files.InaccessibleRoots.Add(blocked);
+
+        Assert.AreEqual(expected, _resolver.Resolve(WorkspaceTarget.IntelliJIdea)?.Path);
     }
 
     [TestMethod]
@@ -308,17 +369,28 @@ public sealed class WindowsExecutableResolverTests
                     : path.Trim('\\', '/')));
         }
 
-        public IEnumerable<string> EnumerateFiles(
-            string path,
-            string searchPattern,
-            SearchOption searchOption)
+        public IEnumerable<string> EnumerateDirectories(string path)
         {
             ThrowIfInaccessible(path);
             var prefix = path.TrimEnd('\\', '/') + "\\";
             return _files
                 .Where(file => file.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                .Where(file => searchOption == SearchOption.AllDirectories
-                    || !GetRelativePath(prefix, file).Contains('\\'))
+                .Select(file => GetRelativePath(prefix, file))
+                .Where(relativePath => relativePath.Contains('\\'))
+                .Select(relativePath =>
+                    prefix + relativePath[..relativePath.IndexOf('\\')])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        public IEnumerable<string> EnumerateFiles(string path, string searchPattern)
+        {
+            ThrowIfInaccessible(path);
+            var prefix = path.TrimEnd('\\', '/') + "\\";
+            return _files
+                .Where(file => file.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Where(file => !GetRelativePath(prefix, file).Contains('\\'))
                 .Where(file => string.Equals(
                     GetFileName(file),
                     searchPattern,
