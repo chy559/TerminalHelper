@@ -11,7 +11,7 @@ Terminal Helper 是一个原生 macOS 小工具：把一个或多个文件夹拖
 
 ## 测试、构建与启动
 
-在仓库根目录运行：
+在 `TerminalHelper-mac` 目录中运行：
 
 ```bash
 ./scripts/test.sh
