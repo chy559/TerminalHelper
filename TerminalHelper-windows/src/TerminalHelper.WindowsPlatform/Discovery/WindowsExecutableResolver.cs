@@ -63,13 +63,13 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
 
     private string? ResolveVisualStudioCode()
     {
-        var pathCandidate = FindOnPath(["code.exe", "Code.exe", "code.cmd"]);
+        var pathCandidate = FindVisualStudioCodeOnPath();
         if (pathCandidate is not null)
         {
             return pathCandidate;
         }
 
-        var fixedCandidate = FirstExisting(
+        var fixedCandidate = FirstExistingVisualStudioCodeExecutable(
         [
             CombineOptional(_environment.LocalAppData, "Programs", "Microsoft VS Code", "Code.exe"),
             CombineOptional(_environment.ProgramFiles, "Microsoft VS Code", "Code.exe"),
@@ -82,7 +82,8 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
 
         foreach (var appPath in GetAppPathsSafely("Code.exe"))
         {
-            var candidate = FindExisting(CleanRegistryExecutablePath(appPath));
+            var candidate = FindExistingVisualStudioCodeExecutable(
+                CleanRegistryExecutablePath(appPath));
             if (candidate is not null)
             {
                 return candidate;
@@ -96,10 +97,9 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
                      .OrderBy(application => application.DisplayName, StringComparer.OrdinalIgnoreCase)
                      .ThenBy(application => application.InstallLocation, StringComparer.OrdinalIgnoreCase))
         {
-            var candidate = FirstExisting(
+            var candidate = FirstExistingVisualStudioCodeExecutable(
             [
                 CombineOptional(application.InstallLocation, "Code.exe"),
-                CombineOptional(application.InstallLocation, "bin", "code.cmd"),
                 CleanRegistryExecutablePath(application.DisplayIcon),
             ]);
             if (candidate is not null)
@@ -113,18 +113,12 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
 
     private string? ResolveIntelliJIdea()
     {
-        var pathCandidate = FindOnPath(["idea64.exe"])
-            ?? FindOnPath(["idea.exe"]);
-        if (pathCandidate is not null)
-        {
-            return pathCandidate;
-        }
-
         var candidates = new List<IdeaCandidate>();
-        AddProgramFilesIdeaCandidates(candidates, _environment.ProgramFiles, sourceRank: 0);
-        AddProgramFilesIdeaCandidates(candidates, _environment.ProgramFilesX86, sourceRank: 0);
-        AddRegistryIdeaCandidates(candidates, sourceRank: 1);
-        AddToolboxIdeaCandidates(candidates, sourceRank: 2);
+        AddPathIdeaCandidates(candidates, sourceRank: 0);
+        AddProgramFilesIdeaCandidates(candidates, _environment.ProgramFiles, sourceRank: 1);
+        AddProgramFilesIdeaCandidates(candidates, _environment.ProgramFilesX86, sourceRank: 1);
+        AddRegistryIdeaCandidates(candidates, sourceRank: 2);
+        AddToolboxIdeaCandidates(candidates, sourceRank: 3);
 
         return candidates
             .Where(candidate => SafeFileExists(candidate.Path))
@@ -135,6 +129,100 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
             .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
             .Select(candidate => candidate.Path)
             .FirstOrDefault();
+    }
+
+    private string? FindVisualStudioCodeOnPath()
+    {
+        foreach (var rawEntry in _environment.PathEntries)
+        {
+            var entry = CleanPathEntry(rawEntry);
+            if (entry is null)
+            {
+                continue;
+            }
+
+            var directExecutable = FirstExistingVisualStudioCodeExecutable(
+            [
+                _files.Combine(entry, "code.exe"),
+                _files.Combine(entry, "Code.exe"),
+            ]);
+            if (directExecutable is not null)
+            {
+                return directExecutable;
+            }
+
+            var commandPath = _files.Combine(entry, "code.cmd");
+            var normalizedEntry = TrimEndingDirectorySeparators(entry);
+            if (!SafeFileExists(commandPath)
+                || !GetLastPathComponent(normalizedEntry).Equals(
+                    "bin",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var installDirectory = _files.GetDirectoryName(normalizedEntry);
+            var adjacentExecutable = FindExistingVisualStudioCodeExecutable(
+                CombineOptional(installDirectory, "Code.exe"));
+            if (adjacentExecutable is not null)
+            {
+                return adjacentExecutable;
+            }
+        }
+
+        return null;
+    }
+
+    private void AddPathIdeaCandidates(ICollection<IdeaCandidate> candidates, int sourceRank)
+    {
+        foreach (var rawEntry in _environment.PathEntries)
+        {
+            var entry = CleanPathEntry(rawEntry);
+            if (entry is null)
+            {
+                continue;
+            }
+
+            foreach (var executableName in new[] { "idea64.exe", "idea.exe" })
+            {
+                var path = _files.Combine(entry, executableName);
+                candidates.Add(CreateIdeaCandidate(
+                    path,
+                    GetPathIdeaIdentity(path),
+                    executableName,
+                    sourceRank));
+            }
+        }
+    }
+
+    private string GetPathIdeaIdentity(string executablePath)
+    {
+        var launcherDirectory = _files.GetDirectoryName(executablePath);
+        var productDirectory = launcherDirectory is null
+            ? null
+            : _files.GetDirectoryName(launcherDirectory);
+        var metadataPath = CombineOptional(productDirectory, "product-info.json");
+        if (metadataPath is null || !SafeFileExists(metadataPath))
+        {
+            return executablePath;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(_files.ReadAllText(metadataPath));
+            var product = document.RootElement;
+            var identity = GetIdeaProductIdentity(product);
+            if (identity is null || !IsIdeaProduct(product, identity))
+            {
+                return executablePath;
+            }
+
+            return $"{identity} {GetJsonString(product, "version")}";
+        }
+        catch (Exception error) when (IsOptionalFileOrMetadataFailure(error))
+        {
+            return executablePath;
+        }
     }
 
     private string? FindOnPath(IReadOnlyList<string> executableNames)
@@ -256,8 +344,8 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
                     continue;
                 }
 
-                var name = GetJsonString(product, "name") ?? GetJsonString(product, "productCode");
-                if (name is null || !IsIdeaProduct(product, name))
+                var identity = GetIdeaProductIdentity(product);
+                if (identity is null || !IsIdeaProduct(product, identity))
                 {
                     continue;
                 }
@@ -297,7 +385,7 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
                     var path = _files.Combine(productDirectory, relativePath);
                     candidates.Add(CreateIdeaCandidate(
                         path,
-                        $"{name} {version}",
+                        $"{identity} {version}",
                         GetLastPathComponent(relativePath),
                         sourceRank));
                 }
@@ -352,6 +440,28 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
         }
 
         return null;
+    }
+
+    private string? FirstExistingVisualStudioCodeExecutable(IEnumerable<string?> candidates)
+    {
+        foreach (var candidate in candidates)
+        {
+            var existing = FindExistingVisualStudioCodeExecutable(candidate);
+            if (existing is not null)
+            {
+                return existing;
+            }
+        }
+
+        return null;
+    }
+
+    private string? FindExistingVisualStudioCodeExecutable(string? path)
+    {
+        return path is not null
+            && GetLastPathComponent(path).Equals("Code.exe", StringComparison.OrdinalIgnoreCase)
+                ? FindExisting(path)
+                : null;
     }
 
     private string? FindExisting(string? path)
@@ -471,6 +581,25 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
         return entry.Length == 0 ? null : entry;
     }
 
+    private static string TrimEndingDirectorySeparators(string path)
+    {
+        var minimumLength = path.Length >= 3
+            && char.IsAsciiLetter(path[0])
+            && path[1] == ':'
+            && path[2] is '\\' or '/'
+                ? 3
+                : path.Length > 0 && path[0] is '\\' or '/'
+                    ? 1
+                    : 0;
+        var length = path.Length;
+        while (length > minimumLength && path[length - 1] is '\\' or '/')
+        {
+            length--;
+        }
+
+        return length == path.Length ? path : path[..length];
+    }
+
     private static string? CleanRegistryExecutablePath(string? rawPath)
     {
         if (string.IsNullOrWhiteSpace(rawPath))
@@ -516,6 +645,19 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
                 : null;
     }
 
+    private static string? GetIdeaProductIdentity(JsonElement product)
+    {
+        var productCode = GetJsonString(product, "productCode");
+        var name = GetJsonString(product, "name");
+        return (productCode, name) switch
+        {
+            ({ Length: > 0 }, { Length: > 0 }) => $"{productCode} {name}",
+            ({ Length: > 0 }, _) => productCode,
+            (_, { Length: > 0 }) => name,
+            _ => null,
+        };
+    }
+
     private static bool IsIdeaExecutable(string path)
     {
         var name = GetLastPathComponent(path);
@@ -531,13 +673,23 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
 
     private static IdeaEdition GetIdeaEdition(string identity)
     {
-        return identity.Contains("Community", StringComparison.OrdinalIgnoreCase)
+        if (identity.Contains("Community", StringComparison.OrdinalIgnoreCase)
             || identity.Contains("IDEA-C", StringComparison.OrdinalIgnoreCase)
             || identity.Contains("IdeaIC", StringComparison.OrdinalIgnoreCase)
             || identity.Equals("IC", StringComparison.OrdinalIgnoreCase)
-            || identity.StartsWith("IC ", StringComparison.OrdinalIgnoreCase)
-            ? IdeaEdition.Community
-            : IdeaEdition.Ultimate;
+            || identity.StartsWith("IC ", StringComparison.OrdinalIgnoreCase))
+        {
+            return IdeaEdition.Community;
+        }
+
+        return identity.Contains("Ultimate", StringComparison.OrdinalIgnoreCase)
+            || identity.Contains("IDEA-U", StringComparison.OrdinalIgnoreCase)
+            || identity.Contains("IdeaIU", StringComparison.OrdinalIgnoreCase)
+            || identity.Equals("IU", StringComparison.OrdinalIgnoreCase)
+            || identity.StartsWith("IU ", StringComparison.OrdinalIgnoreCase)
+            || identity.Contains("IntelliJ IDEA", StringComparison.OrdinalIgnoreCase)
+                ? IdeaEdition.Ultimate
+                : IdeaEdition.Unknown;
     }
 
     private static Version GetVersion(string identity)
@@ -585,6 +737,7 @@ public sealed partial class WindowsExecutableResolver : ITargetExecutableResolve
     {
         Ultimate,
         Community,
+        Unknown,
     }
 
     private sealed record IdeaCandidate(

@@ -69,6 +69,40 @@ public sealed class MainWindowViewModelTests
     }
 
     [TestMethod]
+    public async Task LaunchAsync_ReplacementSelectionStaysDisabledUntilOldLaunchReleasesGate()
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        launcher.PendingLaunch = completion;
+        viewModel.Receive(["first"]);
+        var stateChanges = 0;
+        viewModel.StateChanged += (_, _) => stateChanges++;
+
+        var launch = viewModel.LaunchAsync(WorkspaceTarget.VisualStudioCode);
+        await launcher.LaunchStarted.Task;
+        viewModel.Receive(["second"]);
+
+        Assert.AreEqual("已选择 1 个文件夹", viewModel.StatusText);
+        Assert.IsTrue(viewModel.IsLaunching);
+        Assert.AreEqual(WorkspaceTarget.VisualStudioCode, viewModel.LaunchingTarget);
+        Assert.IsTrue(viewModel.TargetOptions.Single(
+            option => option.Target == WorkspaceTarget.VisualStudioCode).IsLaunching);
+        Assert.IsFalse(viewModel.TargetOptions.Any(option => option.CanLaunch));
+
+        var changesBeforeCompletion = stateChanges;
+        completion.SetResult();
+        await launch;
+
+        Assert.IsFalse(viewModel.IsLaunching);
+        Assert.IsNull(viewModel.LaunchingTarget);
+        Assert.IsFalse(viewModel.TargetOptions.Any(option => option.IsLaunching));
+        Assert.IsTrue(viewModel.TargetOptions.Single(
+            option => option.Target == WorkspaceTarget.Terminal).CanLaunch);
+        Assert.IsTrue(viewModel.TargetOptions.Single(
+            option => option.Target == WorkspaceTarget.VisualStudioCode).CanLaunch);
+        Assert.IsGreaterThan(changesBeforeCompletion, stateChanges);
+    }
+
+    [TestMethod]
     public void Reset_ReturnsTheEmptyState()
     {
         viewModel.Receive(["first"]);
@@ -150,6 +184,9 @@ public sealed class MainWindowViewModelTests
 
         public TaskCompletionSource? PendingLaunch { get; set; }
 
+        public TaskCompletionSource LaunchStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public bool IsAvailable(WorkspaceTarget target)
         {
             return AvailableTargets.Contains(target);
@@ -160,6 +197,7 @@ public sealed class MainWindowViewModelTests
             WorkspaceTarget target,
             CancellationToken cancellationToken)
         {
+            LaunchStarted.TrySetResult();
             if (PendingLaunch is not null)
             {
                 await PendingLaunch.Task.WaitAsync(cancellationToken);

@@ -27,7 +27,9 @@
                                 FontSize="42"
                                 Glyph="&#xE8B7;" />
                             <TextBlock
+                                x:Name="EmptyHeadingText"
                                 HorizontalAlignment="Center"
+                                AutomationProperties.HeadingLevel="Level1"
                                 FontSize="24"
                                 FontWeight="SemiBold"
                                 Text="拖入文件夹" />
@@ -35,6 +37,7 @@
                                 x:Name="EmptyStatusText"
                                 MaxWidth="330"
                                 HorizontalAlignment="Center"
+                                AutomationProperties.LiveSetting="Polite"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Text="拖入文件夹，然后选择打开方式"
                                 TextAlignment="Center"
@@ -43,6 +46,7 @@
                                 x:Name="EmptyErrorStatusText"
                                 MaxWidth="330"
                                 HorizontalAlignment="Center"
+                                AutomationProperties.LiveSetting="Assertive"
                                 Foreground="{ThemeResource SystemFillColorCriticalBrush}"
                                 TextAlignment="Center"
                                 TextWrapping="Wrap"
@@ -60,6 +64,7 @@
                         <StackPanel Spacing="4">
                             <TextBlock
                                 x:Name="SelectionCountText"
+                                AutomationProperties.HeadingLevel="Level1"
                                 FontSize="22"
                                 FontWeight="SemiBold"
                                 Text="已选择 0 个文件夹" />
@@ -162,11 +167,13 @@
                             <TextBlock
                                 x:Name="SelectedStatusText"
                                 VerticalAlignment="Center"
+                                AutomationProperties.LiveSetting="Polite"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 TextWrapping="Wrap" />
                             <TextBlock
                                 x:Name="SelectedErrorStatusText"
                                 VerticalAlignment="Center"
+                                AutomationProperties.LiveSetting="Assertive"
                                 Foreground="{ThemeResource SystemFillColorCriticalBrush}"
                                 TextWrapping="Wrap"
                                 Visibility="Collapsed" />

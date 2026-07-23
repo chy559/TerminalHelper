@@ -25,7 +25,8 @@ public sealed class WindowsWorkspaceLauncherTests
         var exception = await Assert.ThrowsAsync<WorkspaceLaunchException>(() =>
             launcher.LaunchAsync([@"C:\\Folder"], WorkspaceTarget.Terminal, CancellationToken.None));
 
-        Assert.Contains(WorkspaceTarget.Terminal.GetDisplayName(), exception.Message);
+        Assert.AreEqual("未找到可执行文件，请先安装后重试", exception.Message);
+        Assert.DoesNotContain(WorkspaceTarget.Terminal.GetDisplayName(), exception.Message);
         Assert.IsEmpty(runner.Requests);
     }
 
@@ -50,6 +51,40 @@ public sealed class WindowsWorkspaceLauncherTests
     }
 
     [TestMethod]
+    public async Task LaunchAsync_ReturnsIncompleteWithoutBlockingCallerWhenRunnerBlocks()
+    {
+        resolver.Executables[WorkspaceTarget.Terminal] =
+            new(WorkspaceTarget.Terminal, @"C:\\Tools\\wt.exe");
+        using var releaseStart = new ManualResetEventSlim();
+        runner.StartBlocker = releaseStart;
+        Task? launch = null;
+        var invocation = Task.Factory.StartNew(
+            () => launcher.LaunchAsync(
+                [@"C:\\Folder"],
+                WorkspaceTarget.Terminal,
+                CancellationToken.None),
+            CancellationToken.None,
+            TaskCreationOptions.DenyChildAttach,
+            TaskScheduler.Default);
+
+        try
+        {
+            await runner.StartEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var returned = await Task.WhenAny(invocation, Task.Delay(TimeSpan.FromSeconds(1)));
+
+            Assert.AreSame(invocation, returned);
+            launch = await invocation;
+            Assert.IsFalse(launch.IsCompleted);
+        }
+        finally
+        {
+            releaseStart.Set();
+        }
+
+        await launch!;
+    }
+
+    [TestMethod]
     public async Task LaunchAsync_StopsAfterFirstRunnerFailure()
     {
         resolver.Executables[WorkspaceTarget.IntelliJIdea] =
@@ -65,7 +100,7 @@ public sealed class WindowsWorkspaceLauncherTests
     }
 
     [TestMethod]
-    public async Task LaunchAsync_ConvertsRunnerFailureToTargetSpecificErrorWithoutCommandText()
+    public async Task LaunchAsync_ConvertsRunnerFailureToSanitizedReasonWithoutCommandText()
     {
         resolver.Executables[WorkspaceTarget.VisualStudioCode] =
             new(WorkspaceTarget.VisualStudioCode, @"C:\\VS Code\\Code.exe");
@@ -78,7 +113,8 @@ public sealed class WindowsWorkspaceLauncherTests
             WorkspaceTarget.VisualStudioCode,
             CancellationToken.None));
 
-        Assert.Contains(WorkspaceTarget.VisualStudioCode.GetDisplayName(), exception.Message);
+        Assert.AreEqual("进程启动失败，请重试", exception.Message);
+        Assert.DoesNotContain(WorkspaceTarget.VisualStudioCode.GetDisplayName(), exception.Message);
         Assert.IsNull(exception.InnerException);
         foreach (var sensitiveText in new[] { "Code.exe", "Private Folder", privateCommand })
         {
@@ -153,8 +189,15 @@ public sealed class WindowsWorkspaceLauncherTests
 
         public Action? AfterStart { get; set; }
 
+        public ManualResetEventSlim? StartBlocker { get; set; }
+
+        public TaskCompletionSource StartEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public void Start(ProcessLaunchRequest request)
         {
+            StartEntered.TrySetResult();
+            StartBlocker?.Wait();
             if (Failure is not null || FailureAtRequest == Requests.Count + 1)
             {
                 throw Failure ?? new InvalidOperationException("Runner failed.");

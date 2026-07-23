@@ -28,14 +28,26 @@ public sealed class FolderBatchPlanner
                 continue;
             }
 
+            if (IsNetworkOrDevicePath(rawPath))
+            {
+                failures.Add(new(rawPath, FolderInputFailureReason.NetworkOrDevicePathNotAllowed));
+                continue;
+            }
+
             string fullPath;
             try
             {
-                fullPath = pathService.GetFullPath(rawPath);
+                fullPath = NormalizeTrailingSeparators(pathService.GetFullPath(rawPath));
             }
             catch (Exception error) when (IsInvalidPath(error))
             {
                 failures.Add(new(rawPath, FolderInputFailureReason.InvalidPath));
+                continue;
+            }
+
+            if (IsNetworkOrDevicePath(fullPath))
+            {
+                failures.Add(new(rawPath, FolderInputFailureReason.NetworkOrDevicePathNotAllowed));
                 continue;
             }
 
@@ -54,6 +66,37 @@ public sealed class FolderBatchPlanner
         }
 
         return new(ImmutableArray.CreateRange(valid), ImmutableArray.CreateRange(failures));
+    }
+
+    private static bool IsNetworkOrDevicePath(string path)
+    {
+        return path.Length >= 2
+            && IsDirectorySeparator(path[0])
+            && IsDirectorySeparator(path[1]);
+    }
+
+    private static string NormalizeTrailingSeparators(string path)
+    {
+        var minimumLength = path.Length >= 3
+            && char.IsAsciiLetter(path[0])
+            && path[1] == ':'
+            && IsDirectorySeparator(path[2])
+                ? 3
+                : path.Length > 0 && IsDirectorySeparator(path[0])
+                    ? 1
+                    : 0;
+        var length = path.Length;
+        while (length > minimumLength && IsDirectorySeparator(path[length - 1]))
+        {
+            length--;
+        }
+
+        return length == path.Length ? path : path[..length];
+    }
+
+    private static bool IsDirectorySeparator(char value)
+    {
+        return value is '\\' or '/';
     }
 
     private static bool IsInvalidPath(Exception error)

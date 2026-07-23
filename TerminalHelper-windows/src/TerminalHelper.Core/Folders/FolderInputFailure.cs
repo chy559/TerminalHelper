@@ -4,6 +4,7 @@ public enum FolderInputFailureReason
 {
     Empty,
     InvalidPath,
+    NetworkOrDevicePathNotAllowed,
     MissingOrNotDirectory,
 }
 

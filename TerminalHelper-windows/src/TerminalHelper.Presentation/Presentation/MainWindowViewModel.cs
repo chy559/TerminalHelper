@@ -32,10 +32,9 @@ public sealed class MainWindowViewModel
 
     public bool HasError => coordinator.Status is WorkspaceStatus.Failed;
 
-    public bool IsLaunching => coordinator.Status is WorkspaceStatus.Launching;
+    public bool IsLaunching => coordinator.IsLaunchInProgress;
 
-    public WorkspaceTarget? LaunchingTarget =>
-        coordinator.Status is WorkspaceStatus.Launching launching ? launching.Target : null;
+    public WorkspaceTarget? LaunchingTarget => coordinator.ActiveLaunchTarget;
 
     public IReadOnlyList<TargetOptionViewModel> TargetOptions { get; }
 

@@ -24,7 +24,7 @@ public sealed class WindowsWorkspaceLauncher : IWorkspaceLauncher
         return _resolver.Resolve(target) is not null;
     }
 
-    public Task LaunchAsync(
+    public async Task LaunchAsync(
         IReadOnlyList<string> folders,
         WorkspaceTarget target,
         CancellationToken cancellationToken)
@@ -34,28 +34,30 @@ public sealed class WindowsWorkspaceLauncher : IWorkspaceLauncher
         var executable = _resolver.Resolve(target);
         if (executable is null)
         {
-            return Task.FromException(new WorkspaceLaunchException(
-                $"未找到 {target.GetDisplayName()}，请先安装后重试"));
+            throw new WorkspaceLaunchException("未找到可执行文件，请先安装后重试");
         }
 
         try
         {
-            foreach (var request in _requestFactory.Create(executable, folders))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                _processRunner.Start(request);
-            }
-
-            return Task.CompletedTask;
+            var requests = _requestFactory.Create(executable, folders);
+            await Task.Run(
+                () =>
+                {
+                    foreach (var request in requests)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        _processRunner.Start(request);
+                    }
+                },
+                cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return Task.FromCanceled(cancellationToken);
+            throw;
         }
         catch (Exception)
         {
-            return Task.FromException(new WorkspaceLaunchException(
-                $"无法使用 {target.GetDisplayName()} 打开。"));
+            throw new WorkspaceLaunchException("进程启动失败，请重试");
         }
     }
 }

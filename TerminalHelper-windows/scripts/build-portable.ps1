@@ -12,6 +12,14 @@ $archiveName = 'TerminalHelper-windows-win-x64.zip'
 $archivePath = Join-Path $artifactDirectory $archiveName
 $checksumPath = "$archivePath.sha256"
 $verifyScript = Join-Path $PSScriptRoot 'verify-portable.ps1'
+$verifyPackageScript = Join-Path $PSScriptRoot 'verify-package.ps1'
+
+if (Test-Path -LiteralPath $archivePath) {
+    Remove-Item -LiteralPath $archivePath -Force
+}
+if (Test-Path -LiteralPath $checksumPath) {
+    Remove-Item -LiteralPath $checksumPath -Force
+}
 
 if (Test-Path -LiteralPath $publishDirectory) {
     Remove-Item -LiteralPath $publishDirectory -Recurse -Force
@@ -37,6 +45,8 @@ $checksumLine = "$hash  $archiveName"
     $checksumPath,
     $checksumLine + [Environment]::NewLine,
     [System.Text.UTF8Encoding]::new($false))
+
+& $verifyPackageScript -ArchivePath $archivePath -ChecksumPath $checksumPath
 
 Write-Host "便携包已创建 / Portable package created: $archivePath"
 Write-Host "SHA-256: $checksumLine"

@@ -42,7 +42,8 @@ the Windows build, app commit, target application versions, theme, and display s
 - [ ] With Narrator enabled, each missing target is announced as
   “DISPLAY，未安装” (for example “IntelliJ IDEA，未安装”) and cannot be invoked.
 - [ ] Narrator announces the reset action as “重新选择文件夹”; empty/selected
-  headings, current status, and failure text are readable without pointer use.
+  headings are exposed as headings, and dynamic status/failure changes are announced
+  through the appropriate polite/assertive live regions without pointer use.
 
 ## Folder input and replacement
 
@@ -53,14 +54,24 @@ or a shortcut that forwards path arguments.
 - [ ] Multiple valid folders preserve input order and the header shows their count.
 - [ ] Duplicate folder paths, including paths differing only by letter case, are
   de-duplicated using Windows case-insensitive behavior while preserving first order.
+- [ ] `C:\Work` and `C:\Work\` are de-duplicated without changing a drive root such
+  as `C:\`.
 - [ ] An empty input does not replace or otherwise change an existing selection.
-- [ ] Dropped files are omitted; no file path reaches a target launch.
+- [ ] A file-only drop replaces an older valid selection with an all-invalid result;
+  no file path reaches a target launch.
+- [ ] A mixed folder/file drop keeps only folders and counts every path-bearing file
+  as invalid, matching the same folder/file list supplied through command-line args.
 - [ ] Missing and syntactically invalid paths are rejected and counted as invalid.
 - [ ] An all-invalid batch replaces the old batch, reports “未找到可打开的文件夹”,
   and exposes no executable target action.
 - [ ] A mixed valid/invalid batch keeps only valid folders, reports the invalid count,
   and launches only the valid folders.
 - [ ] A new non-empty batch replaces the previous selection rather than appending.
+- [ ] Start two drops whose storage-item extraction finishes in reverse order. Only
+  the later drop is applied; the older completion never overwrites it.
+- [ ] UNC paths (`\\server\share` and `//server/share`) and device namespace paths
+  (`\\?\` and `\\.\`) are rejected before network/filesystem existence probing.
+  A pre-established mapped drive path such as `Z:\Work` remains accepted.
 - [ ] Paths containing spaces, Chinese characters, apostrophes, `&`, and parentheses
   arrive at each target unchanged and cannot inject an extra command or argument.
 - [ ] Reset clears the current batch, restores the exact empty-state copy, and a
@@ -91,8 +102,22 @@ or a shortcut that forwards path arguments.
 - [ ] Double-click or rapidly press Enter/Space on a target. Only one batch launch
   begins; the active row shows a progress ring and all actions remain disabled.
 - [ ] While a launch is pending, drop a new valid batch. The UI adopts the new batch;
-  the old launch's late success does not clear it or overwrite its status.
+  the old target keeps its progress ring and all target/reset actions remain disabled
+  until the old launch releases its gate. The new selection then becomes actionable
+  automatically, without another user action, and late success does not clear it.
 - [ ] While a launch is pending, drop a new batch and force the old launch to fail.
   The old failure does not replace the new batch's status or selection.
 - [ ] Close the window while a launch or storage-item extraction is pending. The app
   exits without an unhandled exception or a UI update after close.
+
+## Portable package integrity
+
+- [ ] Start a build with stale fixed-name ZIP and `.sha256` files present, then force
+  publishing to fail. The stale artifacts were deleted before publishing and cannot
+  be mistaken for current output.
+- [ ] A successful build verifies the exact one-line checksum sidecar name/syntax,
+  recomputes the actual ZIP SHA-256, extracts to a unique temporary directory, and
+  reruns required-content and no-PDB checks against the extracted root.
+- [ ] Tampering with the ZIP, checksum hash, sidecar filename, spacing, or referenced
+  archive name makes `scripts/verify-package.ps1` fail; its temporary directory is
+  cleaned on both success and failure.

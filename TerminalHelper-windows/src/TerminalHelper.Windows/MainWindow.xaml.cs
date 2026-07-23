@@ -7,6 +7,7 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.Storage;
 using TerminalHelper.Core.Launching;
+using TerminalHelper.Windows.Input;
 using TerminalHelper.Windows.Presentation;
 using WinRT.Interop;
 
@@ -14,6 +15,7 @@ namespace TerminalHelper.Windows;
 
 public sealed partial class MainWindow : Window
 {
+    private readonly LatestInputGate latestDropInput = new();
     private bool isClosed;
     private XamlRoot? xamlRoot;
 
@@ -138,10 +140,18 @@ public sealed partial class MainWindow : Window
 
     private void RenderStatus(TextBlock normalText, TextBlock errorText)
     {
-        normalText.Text = ViewModel.StatusText;
-        errorText.Text = ViewModel.StatusText;
-        normalText.Visibility = ViewModel.HasError ? Visibility.Collapsed : Visibility.Visible;
-        errorText.Visibility = ViewModel.HasError ? Visibility.Visible : Visibility.Collapsed;
+        if (ViewModel.HasError)
+        {
+            normalText.Visibility = Visibility.Collapsed;
+            errorText.Visibility = Visibility.Visible;
+            errorText.Text = ViewModel.StatusText;
+        }
+        else
+        {
+            errorText.Visibility = Visibility.Collapsed;
+            normalText.Visibility = Visibility.Visible;
+            normalText.Text = ViewModel.StatusText;
+        }
     }
 
     private void RenderTarget(
@@ -192,21 +202,28 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
+            var inputGeneration = latestDropInput.BeginInput();
             var items = await args.DataView.GetStorageItemsAsync();
             if (isClosed)
             {
                 return;
             }
 
-            var folderPaths = items
-                .OfType<StorageFolder>()
-                .Select(folder => folder.Path)
-                .Where(path => !string.IsNullOrWhiteSpace(path))
+            var storagePaths = items
+                .Select(item => item switch
+                {
+                    StorageFolder folder => folder.Path,
+                    StorageFile file => file.Path,
+                    _ => null,
+                })
                 .ToArray();
 
             if (!isClosed)
             {
-                ViewModel.Receive(folderPaths);
+                latestDropInput.TryApply(
+                    inputGeneration,
+                    storagePaths,
+                    paths => ViewModel.Receive(paths));
             }
         }
         catch (OperationCanceledException)

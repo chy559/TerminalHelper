@@ -67,6 +67,47 @@ public sealed class WindowsExecutableResolverTests
     }
 
     [TestMethod]
+    public void ResolveVisualStudioCode_DerivesAdjacentExecutableFromPathBinCommand()
+    {
+        _environment.PathEntries = [@"C:\Users\Me\AppData\Local\Programs\Microsoft VS Code\bin"];
+        _files.Add(@"C:\Users\Me\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd");
+        var executable = @"C:\Users\Me\AppData\Local\Programs\Microsoft VS Code\Code.exe";
+        _files.Add(executable);
+
+        Assert.AreEqual(
+            executable,
+            _resolver.Resolve(WorkspaceTarget.VisualStudioCode)?.Path);
+    }
+
+    [TestMethod]
+    public void ResolveVisualStudioCode_PathCommandWithoutAdjacentExecutableFallsBackToFixedExecutable()
+    {
+        _environment.PathEntries = [@"C:\Broken VS Code\bin"];
+        _files.Add(@"C:\Broken VS Code\bin\code.cmd");
+        var fixedExecutable =
+            @"C:\Users\Me\AppData\Local\Programs\Microsoft VS Code\Code.exe";
+        _files.Add(fixedExecutable);
+
+        Assert.AreEqual(
+            fixedExecutable,
+            _resolver.Resolve(WorkspaceTarget.VisualStudioCode)?.Path);
+    }
+
+    [TestMethod]
+    public void ResolveVisualStudioCode_NeverReturnsCommandFilesFromRegistryValues()
+    {
+        _registry.AppPaths["Code.exe"] = [@"C:\Registry\code.cmd"];
+        _registry.Installations =
+        [
+            new("Microsoft Visual Studio Code", @"C:\Missing", @"C:\Uninstall\code.cmd"),
+        ];
+        _files.Add(@"C:\Registry\code.cmd");
+        _files.Add(@"C:\Uninstall\code.cmd");
+
+        Assert.IsNull(_resolver.Resolve(WorkspaceTarget.VisualStudioCode));
+    }
+
+    [TestMethod]
     public void ResolveVisualStudioCode_PrefersUserInstallThenSystemLocations()
     {
         var user = @"C:\Users\Me\AppData\Local\Programs\Microsoft VS Code\Code.exe";
@@ -126,6 +167,83 @@ public sealed class WindowsExecutableResolverTests
 
         Assert.AreEqual(
             @"D:\Second\idea64.exe",
+            _resolver.Resolve(WorkspaceTarget.IntelliJIdea)?.Path);
+    }
+
+    [TestMethod]
+    public void ResolveIdea_PathCommunityMetadataDoesNotOutrankRegistryUltimate()
+    {
+        var pathCommunity = @"C:\JetBrains\IdeaIC\bin\idea64.exe";
+        var registryUltimate = @"D:\JetBrains\IdeaIU\bin\idea64.exe";
+        _environment.PathEntries = [@"C:\JetBrains\IdeaIC\bin"];
+        _files.Add(pathCommunity);
+        _files.AddText(
+            @"C:\JetBrains\IdeaIC\product-info.json",
+            """
+            {
+              "name": "IntelliJ IDEA",
+              "productCode": "IC",
+              "version": "2027.1"
+            }
+            """);
+        _registry.Installations =
+        [
+            new("IntelliJ IDEA Ultimate 2026.3", @"D:\JetBrains\IdeaIU"),
+        ];
+        _files.Add(registryUltimate);
+
+        Assert.AreEqual(
+            registryUltimate,
+            _resolver.Resolve(WorkspaceTarget.IntelliJIdea)?.Path);
+    }
+
+    [TestMethod]
+    public void ResolveIdea_PathCommunityMetadataDoesNotOutrankToolboxUltimate()
+    {
+        var pathCommunity = @"C:\JetBrains\IdeaIC\bin\idea64.exe";
+        var toolboxUltimate =
+            @"C:\Users\Me\AppData\Local\JetBrains\Toolbox\apps\IDEA-U\2026.2\bin\idea64.exe";
+        _environment.PathEntries = [@"C:\JetBrains\IdeaIC\bin"];
+        _files.Add(pathCommunity);
+        _files.AddText(
+            @"C:\JetBrains\IdeaIC\product-info.json",
+            """
+            {
+              "name": "IntelliJ IDEA Community Edition",
+              "version": "2027.1"
+            }
+            """);
+        _files.AddText(
+            @"C:\Users\Me\AppData\Local\JetBrains\Toolbox\apps\IDEA-U\2026.2\product-info.json",
+            """
+            {
+              "productCode": "IU",
+              "version": "2026.2",
+              "launch": [{ "launcherPath": "bin\\idea64.exe" }]
+            }
+            """);
+        _files.Add(toolboxUltimate);
+
+        Assert.AreEqual(
+            toolboxUltimate,
+            _resolver.Resolve(WorkspaceTarget.IntelliJIdea)?.Path);
+    }
+
+    [TestMethod]
+    public void ResolveIdea_UnknownPathCandidateDoesNotOutrankKnownUltimate()
+    {
+        var unknownPath = @"C:\Tools\idea64.exe";
+        var registryUltimate = @"D:\JetBrains\IdeaIU\bin\idea64.exe";
+        _environment.PathEntries = [@"C:\Tools"];
+        _files.Add(unknownPath);
+        _registry.Installations =
+        [
+            new("IntelliJ IDEA Ultimate 2026.3", @"D:\JetBrains\IdeaIU"),
+        ];
+        _files.Add(registryUltimate);
+
+        Assert.AreEqual(
+            registryUltimate,
             _resolver.Resolve(WorkspaceTarget.IntelliJIdea)?.Path);
     }
 

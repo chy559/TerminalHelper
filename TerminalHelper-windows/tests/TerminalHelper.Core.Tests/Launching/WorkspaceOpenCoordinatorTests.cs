@@ -38,16 +38,18 @@ public sealed class WorkspaceOpenCoordinatorTests
         Assert.AreEqual(new WorkspaceStatus.Completed(WorkspaceTarget.Terminal, 1), coordinator.Status);
         Assert.AreEqual("已在 Terminal 中打开 1 个文件夹", coordinator.StatusText);
 
-        launcher.Error = new WorkspaceLaunchException("boom");
+        launcher.Error = new WorkspaceLaunchException("进程启动失败，请重试");
         coordinator.Receive(["second"]);
 
         await coordinator.LaunchAsync(WorkspaceTarget.VisualStudioCode);
 
         Assert.AreEqual(1, coordinator.PendingFolders.Count);
         Assert.AreEqual(
-            new WorkspaceStatus.Failed(WorkspaceTarget.VisualStudioCode, "boom"),
+            new WorkspaceStatus.Failed(WorkspaceTarget.VisualStudioCode, "进程启动失败，请重试"),
             coordinator.Status);
-        Assert.AreEqual("无法使用 Visual Studio Code 打开：boom", coordinator.StatusText);
+        Assert.AreEqual(
+            "无法使用 Visual Studio Code 打开：进程启动失败，请重试",
+            coordinator.StatusText);
     }
 
     [TestMethod]
@@ -94,7 +96,9 @@ public sealed class WorkspaceOpenCoordinatorTests
     [TestMethod]
     public void Receive_AllInvalidInputReportsInvalidCountWithoutPendingFolders()
     {
-        coordinator.Receive(["missing", "invalid"]);
+        coordinator.Receive(["first"]);
+
+        coordinator.Receive(["file", "invalid"]);
 
         Assert.IsEmpty(coordinator.PendingFolders);
         Assert.AreEqual(new WorkspaceStatus.Ready(new WorkspaceSummary(0, 2)), coordinator.Status);
@@ -183,6 +187,34 @@ public sealed class WorkspaceOpenCoordinatorTests
     }
 
     [TestMethod]
+    public async Task LaunchAsync_NewSelectionDoesNotClearLaunchActivityBeforeGateRelease()
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        launcher.PendingLaunch = completion;
+        coordinator.Receive(["first"]);
+        var propertyChanges = new List<string?>();
+        coordinator.PropertyChanged += (_, args) => propertyChanges.Add(args.PropertyName);
+
+        var launch = coordinator.LaunchAsync(WorkspaceTarget.VisualStudioCode);
+        await launcher.LaunchStarted.Task;
+        coordinator.Receive(["second"]);
+
+        Assert.AreEqual(new WorkspaceStatus.Ready(new WorkspaceSummary(1, 0)), coordinator.Status);
+        Assert.IsTrue(coordinator.IsLaunchInProgress);
+        Assert.AreEqual(WorkspaceTarget.VisualStudioCode, coordinator.ActiveLaunchTarget);
+
+        completion.SetResult();
+        await launch;
+
+        Assert.IsFalse(coordinator.IsLaunchInProgress);
+        Assert.IsNull(coordinator.ActiveLaunchTarget);
+        CollectionAssert.Contains(propertyChanges, nameof(coordinator.IsLaunchInProgress));
+        CollectionAssert.Contains(propertyChanges, nameof(coordinator.ActiveLaunchTarget));
+        CollectionAssert.AreEqual(new[] { @"C:\\Second" }, coordinator.PendingFolders.ToArray());
+        Assert.AreEqual(new WorkspaceStatus.Ready(new WorkspaceSummary(1, 0)), coordinator.Status);
+    }
+
+    [TestMethod]
     public async Task Receive_NewSelectionPlanningPreventsOldLaunchCompletionOrRelaunch()
     {
         var paths = new BlockingFolderPathService();
@@ -225,6 +257,7 @@ public sealed class WorkspaceOpenCoordinatorTests
             ["first"] = @"C:\\First",
             ["second"] = @"C:\\Second",
             ["missing"] = @"C:\\Missing",
+            ["file"] = @"C:\\notes.txt",
         };
 
         public string GetFullPath(string path)
@@ -239,7 +272,7 @@ public sealed class WorkspaceOpenCoordinatorTests
 
         public bool DirectoryExists(string path)
         {
-            return path != @"C:\\Missing";
+            return path is not @"C:\\Missing" and not @"C:\\notes.txt";
         }
     }
 

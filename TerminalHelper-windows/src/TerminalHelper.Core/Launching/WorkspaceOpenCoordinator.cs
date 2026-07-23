@@ -14,7 +14,8 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
     private WorkspaceStatus status = new WorkspaceStatus.Idle();
     private long selectionVersion;
     private long pendingFoldersVersion;
-    private int launchInProgress;
+    private bool isLaunchInProgress;
+    private WorkspaceTarget? activeLaunchTarget;
 
     public WorkspaceOpenCoordinator(FolderBatchPlanner folderBatchPlanner, IWorkspaceLauncher launcher)
     {
@@ -29,6 +30,10 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
     public WorkspaceStatus Status => status;
 
     public string StatusText => GetStatusText(status);
+
+    public bool IsLaunchInProgress => isLaunchInProgress;
+
+    public WorkspaceTarget? ActiveLaunchTarget => activeLaunchTarget;
 
     public void Receive(IEnumerable<string> rawPaths)
     {
@@ -80,9 +85,14 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
 
     public async Task LaunchAsync(WorkspaceTarget target, CancellationToken cancellationToken = default)
     {
-        if (Interlocked.CompareExchange(ref launchInProgress, 1, 0) != 0)
+        lock (stateGate)
         {
-            return;
+            if (isLaunchInProgress)
+            {
+                return;
+            }
+
+            SetLaunchActivity(true, target);
         }
 
         try
@@ -145,8 +155,19 @@ public sealed class WorkspaceOpenCoordinator : INotifyPropertyChanged
         }
         finally
         {
-            Volatile.Write(ref launchInProgress, 0);
+            lock (stateGate)
+            {
+                SetLaunchActivity(false, null);
+            }
         }
+    }
+
+    private void SetLaunchActivity(bool inProgress, WorkspaceTarget? target)
+    {
+        isLaunchInProgress = inProgress;
+        activeLaunchTarget = target;
+        OnPropertyChanged(nameof(IsLaunchInProgress));
+        OnPropertyChanged(nameof(ActiveLaunchTarget));
     }
 
     private void SetStatus(WorkspaceStatus value)

@@ -18,9 +18,7 @@ public sealed class SystemProcessRunner : IProcessRunner
             startInfo.ArgumentList.Add(argument);
         }
 
-        if (Process.Start(startInfo) is null)
-        {
-            throw new InvalidOperationException("进程未能启动");
-        }
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("进程未能启动");
     }
 }
